@@ -359,7 +359,19 @@ body {
 }
 
 .place .coords { color: var(--muted); font-weight: 400; }
-.place.is-unknown { color: var(--muted); font-weight: 400; }
+.place.is-tool {
+  justify-self: start;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--gentian);
+  font-size: .8rem;
+}
+
+/* OpenStreetMap has no dark style, so darken the tiles in dark mode */
+@media (prefers-color-scheme: dark) {
+  .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9); }
+}
 
 .desc {
   margin: 4px 0 0;

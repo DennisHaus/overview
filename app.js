@@ -6,12 +6,20 @@
 const CONFIG = {
   user: 'dennishaus',          // GitHub user whose Pages sites are listed
 
-  exclude: [],                 // repo names to hide, e.g. ['test-repo']
+  // Repos hidden completely (upper/lower case doesn't matter)
+  exclude: ['debris', 'riverpulse', 'Situationsplan'],
+
+  // Repos that are tools: shown as panels, never on the map.
+  // Anything without a recognised location is a tool automatically;
+  // list a repo here if its name happens to contain a place name.
+  tools: [],
+
   includeForks: false,
 
   // Optional fixes per repo (key = repo name). Everything is optional.
   overrides: {
     // venezia_garden: { title: 'Venezia Garden', place: 'venice' },
+    // some_repo: { kind: 'tool' },   // or kind: 'place' together with a place
     // some_repo: { place: { name: 'Sils Maria', country: 'Switzerland', lat: 46.43, lng: 9.76 } },
     // some_repo: { preview: 'https://dennishaus.github.io/some_repo/cover.jpg', description: 'Text' },
   },
@@ -317,8 +325,12 @@ function buildSite(repo, meta) {
   }
   if (!place) place = findPlace(repo.name, topics, repo.description, meta.pageTitle, meta.description, meta.placeName);
 
+  const listedAsTool = CONFIG.tools.some(n => n.toLowerCase() === repo.name.toLowerCase());
+  const kind = o.kind || (listedAsTool || !place ? 'tool' : 'place');
+  if (kind === 'tool') place = null; // tools never get a pin
+
   const searchText = norm([
-    title, repo.name, description, meta.pageTitle, topics,
+    title, repo.name, description, meta.pageTitle, topics, kind === 'tool' ? 'tool tools' : 'place places',
     place?.name, place?.country, place && COUNTRY_WORDS[place.country], place?.aliases?.join(' '),
   ].filter(Boolean).join(' '));
 
@@ -329,6 +341,7 @@ function buildSite(repo, meta) {
     source: repo.html_url,
     description,
     place,
+    kind,
     previews: [o.preview, meta.image, `${url}preview.png`, `${url}preview.jpg`].filter(Boolean),
     updated: repo.updated || '',
     searchText,
@@ -346,6 +359,7 @@ const state = {
   visible: new Set(),       // cards currently near the viewport
   live: store.get('hub:live', true),
   view: store.get('hub:view', 'both'),
+  kind: store.get('hub:kind', 'all'),
 };
 
 const el = {
@@ -357,7 +371,8 @@ const el = {
   search: $('#search'),
   sort: $('#sort'),
   live: $('#live'),
-  viewButtons: [...document.querySelectorAll('.views button')],
+  viewButtons: [...document.querySelectorAll('button[data-view]')],
+  kindButtons: [...document.querySelectorAll('button[data-kind]')],
 };
 
 function setStatus(text, isError = false) {
@@ -372,10 +387,9 @@ let map, markerLayer;
 
 function initMap() {
   map = L.map('map', { zoomControl: true, worldCopyJump: true }).setView([46.6, 10.2], 6);
-  const dark = matchMedia('(prefers-color-scheme: dark)').matches;
-  L.tileLayer(`https://{s}.basemaps.cartocdn.com/${dark ? 'dark_all' : 'rastertiles/voyager'}/{z}/{x}/{y}{r}.png`, {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    subdomains: 'abcd',
+  // OpenStreetMap tiles: free, no API key, attribution required
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19,
   }).addTo(map);
   markerLayer = L.layerGroup().addTo(map);
@@ -466,8 +480,8 @@ function makeCard(site) {
     coords.textContent = coordLabel(site.place);
     place.append(coords);
   } else {
-    place.classList.add('is-unknown');
-    place.textContent = 'No location yet';
+    place.classList.add('is-tool');
+    place.textContent = 'Tool';
   }
 
   meta.append(h, place);
@@ -624,28 +638,32 @@ function applyFilter(fit = false) {
   const tokens = norm(raw).split(' ').filter(Boolean);
   const shownPins = [];
   let shown = 0;
-  let unplaced = 0;
+  let tools = 0;
 
   for (const site of state.sites) {
-    const match = tokens.every(t => site.searchText.includes(t));
+    const match = (state.kind === 'all' || site.kind === state.kind) &&
+      tokens.every(t => site.searchText.includes(t));
     state.cards.get(site.id).hidden = !match;
     const marker = state.markers.get(site.id);
     if (marker) {
       if (match) { markerLayer.addLayer(marker); shownPins.push(marker.getLatLng()); }
       else markerLayer.removeLayer(marker);
     }
-    if (match) { shown++; if (!site.place) unplaced++; }
+    if (match) { shown++; if (site.kind === 'tool') tools++; }
   }
 
-  const total = state.sites.length;
-  if (!tokens.length) setStatus(`${total} ${total === 1 ? 'website' : 'websites'}`);
-  else if (shown) setStatus(`${shown} of ${total} match “${raw}”`);
-  else setStatus(`Nothing matches “${raw}”. Try a place, a country or part of a name.`);
+  const places = shown - tools;
+  const count = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const summary = `${count(places, 'place')}, ${count(tools, 'tool')}`;
+  if (tokens.length && !shown) setStatus(`Nothing matches “${raw}”. Try a place, a country or part of a name.`);
+  else if (!shown) setStatus(state.kind === 'tool' ? 'No tools yet.' : 'No places yet.');
+  else if (tokens.length) setStatus(`${summary} match “${raw}”`);
+  else setStatus(summary);
 
-  el.mapnote.hidden = unplaced === 0;
-  el.mapnote.textContent = unplaced === 1
-    ? '1 website has no location yet. Add one under overrides in app.js.'
-    : `${unplaced} websites have no location yet. Add them under overrides in app.js.`;
+  el.mapnote.hidden = tools === 0;
+  el.mapnote.textContent = tools === 1
+    ? '1 tool is listed in the panels only.'
+    : `${tools} tools are listed in the panels only.`;
 
   if (fit) fitMap(shownPins);
   refreshLive();
@@ -692,6 +710,14 @@ function initControls() {
   });
 
   el.viewButtons.forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
+
+  const setKind = kind => {
+    state.kind = ['all', 'place', 'tool'].includes(kind) ? kind : 'all';
+    el.kindButtons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.kind === state.kind)));
+    store.set('hub:kind', state.kind);
+  };
+  setKind(state.kind);
+  el.kindButtons.forEach(b => b.addEventListener('click', () => { setKind(b.dataset.kind); applyFilter(true); }));
 
   const q = new URLSearchParams(location.search).get('q');
   if (q) el.search.value = q;
