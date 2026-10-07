@@ -381,27 +381,112 @@ function setStatus(text, isError = false) {
 }
 
 /* =====================================================================
-   Map
+   Map — vector tiles (OpenFreeMap, no API key) drawn with MapLibre.
+   Only relief, forests, glaciers, lakes, rivers and place names are drawn:
+   no roads, railways, paths or ferry routes.
    ===================================================================== */
-let map, markerLayer;
+const MAP_COLORS = {
+  land: '#050505',
+  shadow: '#000000',
+  highlight: '#2c2c2c',
+  forest: '#0e1410',
+  glacier: '#1b1b1b',
+  water: '#121820',
+  label: '#9a9a9a',
+};
 
-function initMap() {
-  map = L.map('map', { zoomControl: true, worldCopyJump: true }).setView([46.6, 10.2], 6);
-  // OpenStreetMap tiles: free, no API key, attribution required
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    maxZoom: 19,
-  }).addTo(map);
-  markerLayer = L.layerGroup().addTo(map);
+const MAP_STYLE = {
+  version: 8,
+  glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+  sources: {
+    omt: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' },
+    dem: {
+      type: 'raster-dem',
+      tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+      encoding: 'terrarium',
+      tileSize: 256,
+      maxzoom: 13,
+    },
+  },
+  layers: [
+    { id: 'land', type: 'background', paint: { 'background-color': MAP_COLORS.land } },
+    {
+      id: 'relief', type: 'hillshade', source: 'dem',
+      paint: {
+        'hillshade-exaggeration': 0.55,
+        'hillshade-shadow-color': MAP_COLORS.shadow,
+        'hillshade-highlight-color': MAP_COLORS.highlight,
+        'hillshade-accent-color': MAP_COLORS.shadow,
+      },
+    },
+    {
+      id: 'forest', type: 'fill', source: 'omt', 'source-layer': 'landcover',
+      filter: ['==', ['get', 'class'], 'wood'],
+      paint: { 'fill-color': MAP_COLORS.forest, 'fill-opacity': 0.75 },
+    },
+    {
+      id: 'glacier', type: 'fill', source: 'omt', 'source-layer': 'landcover',
+      filter: ['==', ['get', 'class'], 'ice'],
+      paint: { 'fill-color': MAP_COLORS.glacier, 'fill-opacity': 0.8 },
+    },
+    {
+      id: 'rivers', type: 'line', source: 'omt', 'source-layer': 'waterway',
+      filter: ['in', ['get', 'class'], ['literal', ['river', 'canal']]],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': MAP_COLORS.water,
+        'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.6, 10, 1.6, 14, 4],
+      },
+    },
+    {
+      id: 'streams', type: 'line', source: 'omt', 'source-layer': 'waterway', minzoom: 11,
+      filter: ['==', ['get', 'class'], 'stream'],
+      paint: { 'line-color': MAP_COLORS.water, 'line-width': 0.8 },
+    },
+    {
+      id: 'lakes', type: 'fill', source: 'omt', 'source-layer': 'water',
+      paint: { 'fill-color': MAP_COLORS.water },
+    },
+    placeLabels('cities', ['city'], 4, 12),
+    placeLabels('towns', ['town'], 8, 11),
+    placeLabels('villages', ['village'], 11, 10),
+  ],
+};
+
+function placeLabels(id, classes, minzoom, size) {
+  return {
+    id, type: 'symbol', source: 'omt', 'source-layer': 'place', minzoom,
+    filter: ['in', ['get', 'class'], ['literal', classes]],
+    layout: {
+      'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name']],
+      'text-font': ['Noto Sans Regular'],
+      'text-size': size,
+      'text-letter-spacing': 0.04,
+    },
+    paint: {
+      'text-color': MAP_COLORS.label,
+      'text-halo-color': '#000000',
+      'text-halo-width': 1.2,
+    },
+  };
 }
 
-const pinIcon = () => L.divIcon({
-  className: 'pin-wrap',
-  html: '<span class="pin"></span>',
-  iconSize: [22, 22],
-  iconAnchor: [11, 11],
-  popupAnchor: [0, -10],
-});
+let map;
+
+function initMap() {
+  map = new maplibregl.Map({
+    container: 'map',
+    style: MAP_STYLE,
+    center: [10.2, 46.6],
+    zoom: 5.3,
+    attributionControl: false,   // credit is shown as plain text in index.html
+    dragRotate: false,
+    pitchWithRotate: false,
+    renderWorldCopies: false,
+  });
+  map.touchZoomRotate.disableRotation();
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+}
 
 function popupFor(site) {
   const box = document.createElement('div');
@@ -423,19 +508,55 @@ function popupFor(site) {
   return box;
 }
 
-function fitMap(latlngs) {
-  if (!map || !latlngs.length || state.view === 'panels') return;
-  const animate = !reducedMotion();
-  if (latlngs.length === 1) map.setView(latlngs[0], 11, { animate });
-  else map.fitBounds(L.latLngBounds(latlngs).pad(0.2), { maxZoom: 11, animate });
+function makeMarker(site, lngLat) {
+  const wrap = document.createElement('button');
+  wrap.type = 'button';
+  wrap.className = 'pin-wrap';
+  wrap.setAttribute('aria-label', `${site.title}, ${placeLabel(site.place)}`);
+  wrap.innerHTML = '<span class="pin"></span>';
+
+  const popup = new maplibregl.Popup({ offset: 14, closeButton: false, maxWidth: '260px' })
+    .setDOMContent(popupFor(site));
+  const marker = new maplibregl.Marker({ element: wrap }).setLngLat(lngLat).setPopup(popup);
+
+  wrap.addEventListener('mouseenter', () => setActive(site.id, true));
+  wrap.addEventListener('mouseleave', () => setActive(site.id, false));
+  wrap.addEventListener('click', () => {
+    const card = state.cards.get(site.id);
+    if (card && state.view !== 'map') card.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' });
+  });
+
+  return { marker, el: wrap, lngLat, on: false };
+}
+
+function showMarker(entry, show) {
+  if (show && !entry.on) entry.marker.addTo(map);
+  if (!show && entry.on) entry.marker.remove();
+  entry.on = show;
+}
+
+function visiblePins() {
+  return [...state.markers.values()].filter(m => m.on).map(m => m.lngLat);
+}
+
+function fitMap(lngLats) {
+  if (!map || !lngLats.length || state.view === 'panels') return;
+  const duration = reducedMotion() ? 0 : 700;
+  if (lngLats.length === 1) {
+    map.easeTo({ center: lngLats[0], zoom: 10, duration });
+    return;
+  }
+  const bounds = new maplibregl.LngLatBounds(lngLats[0], lngLats[0]);
+  lngLats.forEach(p => bounds.extend(p));
+  map.fitBounds(bounds, { padding: 70, maxZoom: 10, duration });
 }
 
 function setActive(id, on) {
   state.cards.get(id)?.classList.toggle('is-active', on);
-  const marker = state.markers.get(id);
-  if (marker) {
-    marker.getElement()?.querySelector('.pin')?.classList.toggle('is-active', on);
-    marker.setZIndexOffset(on ? 1000 : 0);
+  const entry = state.markers.get(id);
+  if (entry) {
+    entry.el.querySelector('.pin').classList.toggle('is-active', on);
+    entry.el.style.zIndex = on ? '2' : '';
   }
 }
 
@@ -585,7 +706,7 @@ function initViewObserver() {
    ===================================================================== */
 function render() {
   el.grid.replaceChildren();
-  markerLayer.clearLayers();
+  state.markers.forEach(m => m.marker.remove());
   state.cards.clear();
   state.markers.clear();
   state.byId = new Map(state.sites.map(s => [s.id, s]));
@@ -600,17 +721,8 @@ function render() {
       taken.set(key, n + 1);
       const r = n ? 0.006 * Math.sqrt(n) : 0;
       const a = n * 2.4;
-      const latlng = [site.place.lat + r * Math.cos(a), site.place.lng + r * Math.sin(a) * 1.4];
-
-      const marker = L.marker(latlng, { icon: pinIcon(), title: site.title, riseOnHover: true });
-      marker.bindPopup(() => popupFor(site));
-      marker.on('mouseover', () => setActive(site.id, true));
-      marker.on('mouseout', () => setActive(site.id, false));
-      marker.on('click', () => {
-        const card = state.cards.get(site.id);
-        if (card && state.view !== 'map') card.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' });
-      });
-      state.markers.set(site.id, marker);
+      const lngLat = [site.place.lng + r * Math.sin(a) * 1.4, site.place.lat + r * Math.cos(a)];
+      state.markers.set(site.id, makeMarker(site, lngLat));
     }
   }
 
@@ -644,10 +756,10 @@ function applyFilter(fit = false) {
     const match = (state.kind === 'all' || site.kind === state.kind) &&
       tokens.every(t => site.searchText.includes(t));
     state.cards.get(site.id).hidden = !match;
-    const marker = state.markers.get(site.id);
-    if (marker) {
-      if (match) { markerLayer.addLayer(marker); shownPins.push(marker.getLatLng()); }
-      else markerLayer.removeLayer(marker);
+    const entry = state.markers.get(site.id);
+    if (entry) {
+      showMarker(entry, match);
+      if (match) shownPins.push(entry.lngLat);
     }
     if (match) { shown++; if (site.kind === 'tool') tools++; }
   }
@@ -678,8 +790,8 @@ function setView(view) {
   el.viewButtons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === view)));
   store.set('hub:view', view);
   requestAnimationFrame(() => {
-    map.invalidateSize();
-    if (view !== 'panels') fitMap([...markerLayer.getLayers()].map(m => m.getLatLng()));
+    map.resize();
+    if (view !== 'panels') fitMap(visiblePins());
   });
 }
 
