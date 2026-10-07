@@ -357,7 +357,7 @@ const state = {
   cards: new Map(),
   markers: new Map(),
   visible: new Set(),       // cards currently near the viewport
-  live: store.get('hub:live', true),
+  live: true,               // live previews are always on
   view: store.get('hub:view', 'both'),
   kind: store.get('hub:kind', 'all'),
 };
@@ -370,7 +370,6 @@ const el = {
   mapnote: $('#mapnote'),
   search: $('#search'),
   sort: $('#sort'),
-  live: $('#live'),
   viewButtons: [...document.querySelectorAll('button[data-view]')],
   kindButtons: [...document.querySelectorAll('button[data-kind]')],
 };
@@ -386,13 +385,13 @@ function setStatus(text, isError = false) {
    no roads, railways, paths or ferry routes.
    ===================================================================== */
 const MAP_COLORS = {
-  land: '#050505',
-  shadow: '#000000',
-  highlight: '#2c2c2c',
-  forest: '#0e1410',
-  glacier: '#1b1b1b',
-  water: '#121820',
-  label: '#9a9a9a',
+  land: '#1c1c1c',
+  shadow: '#060606',
+  highlight: '#6a6a6a',
+  forest: '#1f2b22',
+  glacier: '#3c3f42',
+  water: '#26333f',
+  label: '#c8c8c8',
 };
 
 const MAP_STYLE = {
@@ -413,7 +412,7 @@ const MAP_STYLE = {
     {
       id: 'relief', type: 'hillshade', source: 'dem',
       paint: {
-        'hillshade-exaggeration': 0.55,
+        'hillshade-exaggeration': 0.65,
         'hillshade-shadow-color': MAP_COLORS.shadow,
         'hillshade-highlight-color': MAP_COLORS.highlight,
         'hillshade-accent-color': MAP_COLORS.shadow,
@@ -501,8 +500,7 @@ function popupFor(site) {
   const links = document.createElement('div');
   links.className = 'links';
   const open = Object.assign(document.createElement('a'), { href: site.url, target: '_blank', rel: 'noopener', textContent: 'Open website' });
-  const code = Object.assign(document.createElement('a'), { href: site.source, target: '_blank', rel: 'noopener', textContent: 'View code' });
-  links.append(open, code);
+  links.append(open);
 
   box.append(title, where, links);
   return box;
@@ -814,12 +812,10 @@ function initControls() {
 
   el.sort.addEventListener('change', () => { sortGrid(); refreshLive(); });
 
-  el.live.checked = state.live;
-  el.live.addEventListener('change', () => {
-    state.live = el.live.checked;
-    store.set('hub:live', state.live);
-    refreshLive();
-  });
+  const about = $('#about');
+  $('#about-open').addEventListener('click', () => about.showModal());
+  $('#about-close').addEventListener('click', () => about.close());
+  about.addEventListener('click', e => { if (e.target === about) about.close(); }); // click outside closes
 
   el.viewButtons.forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
 

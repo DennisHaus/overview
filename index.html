@@ -51,10 +51,7 @@
         <button type="button" data-view="map" aria-pressed="false">Map</button>
       </div>
 
-      <label class="toggle">
-        <input id="live" type="checkbox" checked>
-        <span>Live previews</span>
-      </label>
+      <button id="about-open" class="about-btn" type="button" aria-haspopup="dialog">About</button>
     </div>
   </header>
 
@@ -70,6 +67,14 @@
       <p class="credit">© OpenStreetMap contributors, OpenMapTiles, OpenFreeMap, Mapzen terrain</p>
     </section>
   </main>
+
+  <dialog id="about" class="about" aria-labelledby="about-title">
+    <h2 id="about-title">About</h2>
+    <p>This platform is part of the doctoral research project by Dennis Häusler.</p>
+    <p>Contact: <a href="mailto:haeusler@arch.ethz.ch">haeusler@arch.ethz.ch</a></p>
+    <p class="about-copy">© ETH Zürich, Institute for Landscape and Urban Studies, Professur Voser</p>
+    <button id="about-close" class="about-close" type="button">Close</button>
+  </dialog>
 
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <script src="app.js"></script>
