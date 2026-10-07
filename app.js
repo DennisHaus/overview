@@ -129,6 +129,12 @@ const COUNTRY_WORDS = {
   Czechia: 'czech republic tschechien',
 };
 
+// Country from the first letters of <meta name="geo.region" content="CH-GR">
+const REGION_COUNTRIES = {
+  CH: 'Switzerland', IT: 'Italy', DE: 'Germany', AT: 'Austria', FR: 'France', LI: 'Liechtenstein',
+  GB: 'United Kingdom', NL: 'Netherlands', ES: 'Spain', PT: 'Portugal', CZ: 'Czechia', SI: 'Slovenia',
+};
+
 /* =====================================================================
    Helpers
    ===================================================================== */
@@ -299,11 +305,12 @@ async function fetchPageMeta(url) {
     if (image) { try { image = new URL(image, url).href; } catch { image = ''; } }
 
     return {
-      pageTitle: doc.title?.trim() || '',
+      pageTitle: meta('og:title') || doc.title?.trim() || '',
       description: meta('description') || meta('og:description'),
       image,
       geo,
       placeName: meta('geo.placename'),
+      region: meta('geo.region'),
     };
   } catch {
     return {};
@@ -313,15 +320,18 @@ async function fetchPageMeta(url) {
 function buildSite(repo, meta) {
   const o = CONFIG.overrides[repo.name] || {};
   const url = o.url || pageUrlFor(repo);
-  const title = o.title || titleFromSlug(repo.name.toLowerCase() === ROOT_REPO ? CONFIG.user : repo.name);
+  // Name: override > the website's <title> > the repo name
+  const title = o.title || meta.pageTitle || titleFromSlug(repo.name.toLowerCase() === ROOT_REPO ? CONFIG.user : repo.name);
   const description = o.description || repo.description || meta.description || '';
   const topics = repo.topics.join(' ');
 
   let place = null;
   if (o.place) place = typeof o.place === 'string' ? findPlace(o.place) : o.place;
+  // Exact position from the website's own <meta name="geo.position"> tag
   if (!place && meta.geo) {
     const named = findPlace(meta.placeName, repo.name);
-    place = { name: meta.placeName || named?.name || 'Pinned location', country: named?.country || '', ...meta.geo };
+    const country = REGION_COUNTRIES[(meta.region || '').slice(0, 2).toUpperCase()] || named?.country || '';
+    place = { name: meta.placeName || named?.name || 'Pinned location', country, ...meta.geo };
   }
   if (!place) place = findPlace(repo.name, topics, repo.description, meta.pageTitle, meta.description, meta.placeName);
 
@@ -381,17 +391,15 @@ function setStatus(text, isError = false) {
 
 /* =====================================================================
    Map — vector tiles (OpenFreeMap, no API key) drawn with MapLibre.
-   Only relief, forests, glaciers, lakes, rivers and place names are drawn:
+   Only forests, lakes, rivers and place names are drawn:
    no roads, railways, paths or ferry routes.
    ===================================================================== */
 const MAP_COLORS = {
-  land: '#1c1c1c',
-  shadow: '#060606',
-  highlight: '#6a6a6a',
-  forest: '#1f2b22',
-  glacier: '#3c3f42',
-  water: '#26333f',
-  label: '#c8c8c8',
+  land: '#2b2b2b',
+  forest: '#34413a',
+  water: '#46586a',
+  label: '#dcdcdc',
+  halo: '#1e1e1e',
 };
 
 const MAP_STYLE = {
@@ -399,34 +407,13 @@ const MAP_STYLE = {
   glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
   sources: {
     omt: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' },
-    dem: {
-      type: 'raster-dem',
-      tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
-      encoding: 'terrarium',
-      tileSize: 256,
-      maxzoom: 13,
-    },
   },
   layers: [
     { id: 'land', type: 'background', paint: { 'background-color': MAP_COLORS.land } },
     {
-      id: 'relief', type: 'hillshade', source: 'dem',
-      paint: {
-        'hillshade-exaggeration': 0.65,
-        'hillshade-shadow-color': MAP_COLORS.shadow,
-        'hillshade-highlight-color': MAP_COLORS.highlight,
-        'hillshade-accent-color': MAP_COLORS.shadow,
-      },
-    },
-    {
       id: 'forest', type: 'fill', source: 'omt', 'source-layer': 'landcover',
       filter: ['==', ['get', 'class'], 'wood'],
-      paint: { 'fill-color': MAP_COLORS.forest, 'fill-opacity': 0.75 },
-    },
-    {
-      id: 'glacier', type: 'fill', source: 'omt', 'source-layer': 'landcover',
-      filter: ['==', ['get', 'class'], 'ice'],
-      paint: { 'fill-color': MAP_COLORS.glacier, 'fill-opacity': 0.8 },
+      paint: { 'fill-color': MAP_COLORS.forest },
     },
     {
       id: 'rivers', type: 'line', source: 'omt', 'source-layer': 'waterway',
@@ -464,7 +451,7 @@ function placeLabels(id, classes, minzoom, size) {
     },
     paint: {
       'text-color': MAP_COLORS.label,
-      'text-halo-color': '#000000',
+      'text-halo-color': MAP_COLORS.halo,
       'text-halo-width': 1.2,
     },
   };
@@ -593,7 +580,7 @@ function makeCard(site) {
   const place = document.createElement('p');
   place.className = 'place';
   if (site.place) {
-    place.textContent = `${placeLabel(site.place)} `;
+    place.textContent = placeLabel(site.place);
     const coords = document.createElement('span');
     coords.className = 'coords';
     coords.textContent = coordLabel(site.place);

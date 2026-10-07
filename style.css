@@ -221,7 +221,7 @@ button, input, select { font: inherit; color: inherit; }
   position: relative;
   min-height: 0;
   border-left: 1px solid var(--line);
-  background: #1c1c1c;
+  background: #2b2b2b;
 }
 
 #map { position: absolute; inset: 0; }
@@ -359,6 +359,8 @@ button, input, select { font: inherit; color: inherit; }
   font-size: .8rem;
   font-variant-numeric: tabular-nums;
 }
+
+.place .coords { display: block; }
 
 .desc {
   margin: 4px 0 0;
