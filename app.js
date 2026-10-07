@@ -16,6 +16,9 @@ const CONFIG = {
 
   includeForks: false,
 
+  // Language for place, region and country names found from coordinates ('en', 'de', 'it', …)
+  placeLanguage: 'en',
+
   // Optional fixes per repo (key = repo name). Everything is optional.
   overrides: {
     // venezia_garden: { title: 'Venezia Garden', place: 'venice' },
@@ -180,7 +183,12 @@ function findPlace(...texts) {
 }
 
 function placeLabel(place) {
-  return place ? [place.name, place.country].filter(Boolean).join(', ') : '';
+  if (!place) return '';
+  const parts = [];
+  for (const part of [place.name, place.region, place.country]) {
+    if (part && !parts.some(p => norm(p) === norm(part))) parts.push(part);
+  }
+  return parts.join(', ');
 }
 
 function coordLabel(place) {
@@ -317,22 +325,140 @@ async function fetchPageMeta(url) {
   }
 }
 
+/* ---------- location-config.js in each repo ---------- */
+
+function fetchWithTimeout(url, ms = 6000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  return fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(timer));
+}
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function parseCoords(value) {
+  if (!value) return null;
+  const [lat, lng] = String(value).split(/[;,\s]+/).filter(Boolean).map(Number);
+  const ok = Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+  return ok ? { lat, lng } : null;
+}
+
+// Reads pageTitle and coordinates from <site>/location-config.js without running it.
+// Accepts  coordinates: "45.445947, 12.334221"  or  coordinates: [45.445947, 12.334221]
+async function fetchLocationConfig(url) {
+  try {
+    const res = await fetchWithTimeout(`${url}location-config.js`);
+    if (!res.ok) return {};
+    const text = await res.text();
+
+    const stringValue = key => {
+      const m = text.match(new RegExp(String.raw`["']?\b${key}["']?\s*[:=]\s*(["'\x60])([\s\S]*?)\1`));
+      return m ? m[2].trim() : '';
+    };
+
+    let coords = parseCoords(stringValue('coordinates'));
+    if (!coords) {
+      const m = text.match(/["']?\bcoordinates["']?\s*[:=]\s*\[\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/);
+      if (m) coords = parseCoords(`${m[1]},${m[2]}`);
+    }
+
+    return { pageTitle: stringValue('pageTitle'), coords };
+  } catch {
+    return {};
+  }
+}
+
+/* ---------- place, region and country from coordinates ---------- */
+
+// Results are remembered in the browser, so each spot is only looked up once
+const GEO_CACHE_KEY = `hub:geocode:${CONFIG.placeLanguage}`;
+const geoCache = store.get(GEO_CACHE_KEY, {});
+let geoQueue = Promise.resolve();
+
+// OpenStreetMap's Nominatim allows one request per second, so lookups wait in line
+function reverseGeocode(lat, lng) {
+  const key = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+  if (geoCache[key]) return Promise.resolve(geoCache[key]);
+
+  const job = geoQueue.then(async () => {
+    try {
+      const res = await fetchWithTimeout(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1&accept-language=${CONFIG.placeLanguage}`,
+        8000,
+      );
+      if (!res.ok) return null;
+      const a = (await res.json()).address || {};
+      const result = {
+        name: a.city || a.town || a.village || a.municipality || a.hamlet || a.suburb || '',
+        region: a.state || a.region || a.province || a.county || '',
+        country: a.country || '',
+      };
+      if (!result.name && !result.country) return null;
+      geoCache[key] = result;
+      store.set(GEO_CACHE_KEY, geoCache);
+      return result;
+    } catch {
+      return null;
+    }
+  });
+  geoQueue = job.then(() => sleep(1100));
+  return job;
+}
+
+function distanceKm(a, b) {
+  const rad = d => d * Math.PI / 180;
+  const dLat = rad(b.lat - a.lat);
+  const dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(h));
+}
+
+function nearestPlace(coords, maxKm = 25) {
+  let best = null;
+  let bestKm = maxKm;
+  for (const p of PLACES) {
+    const km = distanceKm(coords, p);
+    if (km < bestKm) { best = p; bestKm = km; }
+  }
+  return best;
+}
+
+// Turns exact coordinates into a full place: name, region and country
+async function describeCoords(coords, meta = {}) {
+  const found = await reverseGeocode(coords.lat, coords.lng);
+  const near = nearestPlace(coords);
+  return {
+    lat: coords.lat,
+    lng: coords.lng,
+    name: found?.name || meta.placeName || near?.name || 'Pinned location',
+    region: found?.region || '',
+    country: found?.country || REGION_COUNTRIES[(meta.region || '').slice(0, 2).toUpperCase()] || near?.country || '',
+    aliases: near?.aliases || [], // so "venezia" still finds Venice
+  };
+}
+
+// Everything the hub reads from one website
+async function readSite(repo) {
+  const url = CONFIG.overrides[repo.name]?.url || pageUrlFor(repo);
+  const [meta, config] = await Promise.all([fetchPageMeta(url), fetchLocationConfig(url)]);
+  meta.config = config;
+  const coords = config.coords || meta.geo;
+  if (coords && !CONFIG.overrides[repo.name]?.place) meta.located = await describeCoords(coords, meta);
+  return meta;
+}
+
 function buildSite(repo, meta) {
   const o = CONFIG.overrides[repo.name] || {};
   const url = o.url || pageUrlFor(repo);
-  // Name: override > the website's <title> > the repo name
-  const title = o.title || meta.pageTitle || titleFromSlug(repo.name.toLowerCase() === ROOT_REPO ? CONFIG.user : repo.name);
+  // Name: override > pageTitle in location-config.js > the website's <title> > the repo name
+  const title = o.title || meta.config?.pageTitle || meta.pageTitle ||
+    titleFromSlug(repo.name.toLowerCase() === ROOT_REPO ? CONFIG.user : repo.name);
   const description = o.description || repo.description || meta.description || '';
   const topics = repo.topics.join(' ');
 
+  // Location: override > coordinates in location-config.js (or geo tags) > place names in the repo
   let place = null;
   if (o.place) place = typeof o.place === 'string' ? findPlace(o.place) : o.place;
-  // Exact position from the website's own <meta name="geo.position"> tag
-  if (!place && meta.geo) {
-    const named = findPlace(meta.placeName, repo.name);
-    const country = REGION_COUNTRIES[(meta.region || '').slice(0, 2).toUpperCase()] || named?.country || '';
-    place = { name: meta.placeName || named?.name || 'Pinned location', country, ...meta.geo };
-  }
+  if (!place && meta.located) place = meta.located;
   if (!place) place = findPlace(repo.name, topics, repo.description, meta.pageTitle, meta.description, meta.placeName);
 
   const listedAsTool = CONFIG.tools.some(n => n.toLowerCase() === repo.name.toLowerCase());
@@ -341,7 +467,7 @@ function buildSite(repo, meta) {
 
   const searchText = norm([
     title, repo.name, description, meta.pageTitle, topics, kind === 'tool' ? 'tool tools' : 'place places',
-    place?.name, place?.country, place && COUNTRY_WORDS[place.country], place?.aliases?.join(' '),
+    place?.name, place?.region, place?.country, place && COUNTRY_WORDS[place.country], place?.aliases?.join(' '),
   ].filter(Boolean).join(' '));
 
   return {
@@ -855,7 +981,7 @@ async function init() {
   }
 
   setStatus(`Reading ${pages.length} websites…`);
-  const metas = await mapLimit(pages, 6, r => fetchPageMeta(CONFIG.overrides[r.name]?.url || pageUrlFor(r)));
+  const metas = await mapLimit(pages, 6, readSite);
   state.sites = pages.map((r, i) => buildSite(r, metas[i]));
   render();
 }
