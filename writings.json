@@ -1,45 +1,270 @@
 [
-	{
-		"file": "writings/2026_HybridModelling.pdf",
-		"id": "http://zotero.org/users/18632873/items/TA7YG9TJ",
-		"type": "chapter",
-		"container-title": "Journal of Digital Landscape Architecture 11-2026",
-		"DOI": "10.14627/537770039",
-		"ISBN": "978-3-87907-770-0",
-		"language": "eng",
-		"publisher": "Wichmann Verlag",
-		"source": "DOI.org (CSL JSON)",
-		"title": "Hybrid Terrain Modeling: A Multidimensional Landscape Design Method",
-		"title-short": "Hybrid Terrain Modeling",
-		"URL": "https://doi.org/10.14627/537770039",
-		"author": [
-			{ "family": "Häusler", "given": "Dennis" },
-			{ "family": "Vollmer", "given": "Matthias" },
-			{ "family": "Voser", "given": "Martina" },
-			{ "family": "Fricker", "given": "Pia" }
-		],
-		"accessed": { "date-parts": [["2026", 7, 23]] },
-		"issued": { "date-parts": [["2026", 5, 28]] }
-	},
-	{
-		"file": "",
-		"id": "http://zotero.org/users/18632873/items/LIV9RLN6",
-		"type": "book",
-		"collection-number": "26",
-		"collection-title": "Pamphlet",
-		"ISBN": "978-3-85676-437-1",
-		"language": "eng",
-		"number-of-pages": "87",
-		"publisher": "gta Verlag ETH Zürich",
-		"publisher-place": "Zurich",
-		"source": "K10plus ISBN",
-		"title": "Probing Zurich",
-		"editor": [
-			{ "family": "Girot", "given": "Christophe" },
-			{ "family": "Häusler", "given": "Dennis" },
-			{ "family": "Vollmer", "given": "Matthias" },
-			{ "family": "Bravo", "given": "Maite" }
-		],
-		"issued": { "date-parts": [["2022"]] }
-	}
+  {
+    "id": "hybrid-terrain-modeling",
+    "type": "chapter",
+    "container-title": "Journal of Digital Landscape Architecture 11-2026",
+    "DOI": "10.14627/537770039",
+    "ISBN": "978-3-87907-770-0",
+    "language": "eng",
+    "publisher": "Wichmann Verlag",
+    "shortTitle": "Hybrid Terrain Modeling",
+    "source": "DOI.org (CSL JSON)",
+    "title": "Hybrid Terrain Modeling: A Multidimensional Landscape Design Method",
+    "title-short": "Hybrid Terrain Modeling",
+    "URL": "https://doi.org/10.14627/537770039",
+    "author": [
+      {
+        "family": "Häusler",
+        "given": "Dennis"
+      },
+      {
+        "family": "Vollmer",
+        "given": "Matthias"
+      },
+      {
+        "family": "Voser",
+        "given": "Martina"
+      },
+      {
+        "family": "Fricker",
+        "given": "Pia"
+      }
+    ],
+    "accessed": {
+      "date-parts": [
+        [
+          2026,
+          7,
+          23
+        ]
+      ]
+    },
+    "issued": {
+      "date-parts": [
+        [
+          "2026",
+          5,
+          28
+        ]
+      ]
+    },
+    "zotero": "TA7YG9TJ",
+    "file": ""
+  },
+  {
+    "id": "spatial-1",
+    "type": "article-journal",
+    "abstract": "Architectural production relies among other methods and tools on models, mock-ups and prototypes. This article proposes the use of spatial 1:1 models, specifically intended for the communication and design of spatial and social aspects in housing projects. Thus discussing the specificity of spatial 1:1 models and how it differs from material mock-ups or architectural prototypes. To demonstrate the relevance of spatial 1:1 models, a case study is presented. To illustrate the specific characteristics and possibilities of representation and interaction in the context of today's cooperative housing the case study addresses threshold spaces and their social implications. Within dense cooperative housing projects, these spatial configurations and the way they are communicated to future residents is critical for a socially sustainable and successful project. The spatial 1:1 model investigates the acceptability and appropriability of threshold spaces and is intended to be an open platform for participation and collaboration. The article addresses the added value of a spatial 1:1 model for the design and communication process between laypersons, architects, and various other stakeholders and its ability to lead to a higher socio-spatial quality in the final projects.",
+    "container-title": "Dimensions. Journal of Architectural Knowledge",
+    "DOI": "10.14361/dak-2023-0505",
+    "ISSN": "2747-5085, 2747-5093",
+    "issue": "1",
+    "journalAbbreviation": "DAK",
+    "language": "en",
+    "license": "https://creativecommons.org/licenses/by/4.0/",
+    "page": "69-88",
+    "shortTitle": "Spatial 1",
+    "source": "DOI.org (Crossref)",
+    "title": "Spatial 1:1 Models - A Tool for Collaborative and Participatory Processes in Housing Projects",
+    "title-short": "Spatial 1",
+    "URL": "https://www.transcript-open.de/doi/10.14361/dak-2023-0505",
+    "volume": "3",
+    "author": [
+      {
+        "family": "Hartmann",
+        "given": "Jana"
+      },
+      {
+        "family": "Häusler",
+        "given": "Dennis"
+      }
+    ],
+    "accessed": {
+      "date-parts": [
+        [
+          2024,
+          10,
+          29
+        ]
+      ]
+    },
+    "issued": {
+      "date-parts": [
+        [
+          2023
+        ]
+      ]
+    },
+    "zotero": "IPITIGL9",
+    "file": ""
+  },
+  {
+    "id": "modeling-urban-complexity-in-point-clouds-and-sound",
+    "type": "book",
+    "language": "eng",
+    "publisher": "Wichmann Verlag",
+    "publisher-place": "DE",
+    "source": "DOI.org (CSL JSON)",
+    "title": "Modeling Urban Complexity in Point Clouds and Sound",
+    "URL": "https://doi.org/10.14627/537724037",
+    "author": [
+      {
+        "family": "Vollmer",
+        "given": "Matthias"
+      },
+      {
+        "family": "Häusler",
+        "given": "Dennis"
+      },
+      {
+        "family": "Gutscher",
+        "given": "Fabian"
+      }
+    ],
+    "accessed": {
+      "date-parts": [
+        [
+          2024,
+          11,
+          20
+        ]
+      ]
+    },
+    "issued": {
+      "date-parts": [
+        [
+          "2022",
+          6,
+          9
+        ]
+      ]
+    },
+    "zotero": "XQ79VYMH",
+    "file": ""
+  },
+  {
+    "id": "probing-zurich",
+    "type": "book",
+    "collection-number": "26",
+    "collection-title": "Pamphlet",
+    "ISBN": "978-3-85676-437-1",
+    "language": "eng",
+    "number-of-pages": "87",
+    "publisher": "gta Verlag ETH Züurich",
+    "publisher-place": "Zurich",
+    "source": "K10plus ISBN",
+    "title": "Probing Zurich",
+    "editor": [
+      {
+        "family": "Girot",
+        "given": "Christophe"
+      },
+      {
+        "family": "Häusler",
+        "given": "Dennis"
+      },
+      {
+        "family": "Vollmer",
+        "given": "Matthias"
+      },
+      {
+        "family": "Bravo",
+        "given": "Maite"
+      }
+    ],
+    "issued": {
+      "date-parts": [
+        [
+          2022
+        ]
+      ]
+    },
+    "zotero": "LIV9RLN6",
+    "file": ""
+  },
+  {
+    "id": "bodies-of-water",
+    "type": "book",
+    "ISBN": "978-3-85676-451-7",
+    "language": "eng ger",
+    "publisher": "gta Verlag",
+    "publisher-place": "Zürich",
+    "shortTitle": "Bodies of water",
+    "source": "K10plus ISBN",
+    "title": "Bodies of Water: A Swiss Landscape Trilogy",
+    "title-short": "Bodies of water",
+    "editor": [
+      {
+        "family": "Girot",
+        "given": "Christophe"
+      },
+      {
+        "family": "Berger",
+        "given": "Ludwig"
+      },
+      {
+        "family": "Gutscher",
+        "given": "Fabian"
+      },
+      {
+        "family": "Häusler",
+        "given": "Dennis"
+      },
+      {
+        "family": "Rebsamen",
+        "given": "Johannes"
+      },
+      {
+        "family": "Vollmer",
+        "given": "Matthias"
+      }
+    ],
+    "issued": {
+      "date-parts": [
+        [
+          2022
+        ]
+      ]
+    },
+    "zotero": "TRISK5KB",
+    "file": ""
+  },
+  {
+    "id": "eine-wand-aus-datenpunkten",
+    "type": "book",
+    "collection-number": "236",
+    "collection-title": "ARCH+",
+    "ISBN": "978-3-931435-53-0",
+    "language": "ger",
+    "note": "OCLC: 1122730167",
+    "number-of-pages": "192-203",
+    "publisher": "Arch+ Verlag GmbH",
+    "publisher-place": "Berlin",
+    "source": "Open WorldCat",
+    "title": "Eine Wand aus Datenpunkten",
+    "volume": "Posthumane Architektur",
+    "author": [
+      {
+        "family": "Häusler",
+        "given": "Dennis"
+      },
+      {
+        "family": "Rebsamen",
+        "given": "Johannes"
+      },
+      {
+        "family": "Vollmer",
+        "given": "Matthias"
+      }
+    ],
+    "issued": {
+      "date-parts": [
+        [
+          2019
+        ]
+      ]
+    },
+    "zotero": "M3S5QR98",
+    "file": ""
+  }
 ]
