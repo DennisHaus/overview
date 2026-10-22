@@ -933,6 +933,17 @@ function makeCard(site) {
     meta.append(d);
   }
 
+  // In the Writings view the panels become list rows: title, authors, year
+  if (isWriting) {
+    const authors = document.createElement('span');
+    authors.className = 'w-authors';
+    authors.textContent = site.authors;
+    const year = document.createElement('span');
+    year.className = 'w-year';
+    year.textContent = site.year;
+    meta.append(authors, year);
+  }
+
   card.append(preview, meta);
 
   if (isWriting) preview.classList.add('is-doc');
@@ -961,6 +972,7 @@ async function resolvePreview(site, card) {
   const box = card.querySelector('.preview');
 
   if (site.kind === 'writing') {
+    if (state.kind === 'writing') { site.previewKind = undefined; return; } // the list shows no covers
     site.previewKind = 'doc';
     if (site.file || site.cover) renderCover(site, card, box);
     return;
@@ -1098,6 +1110,21 @@ function render() {
   applyFilter(true);
 }
 
+// Column names above the list of writings (shown only in the Writings view)
+let listHead = null;
+
+function makeListHead() {
+  const head = document.createElement('div');
+  head.className = 'list-head';
+  head.setAttribute('aria-hidden', 'true');
+  for (const name of ['Title', 'Authors', 'Year']) {
+    const span = document.createElement('span');
+    span.textContent = name;
+    head.append(span);
+  }
+  return head;
+}
+
 // The folder of earlier writings: a full-width row that opens and closes
 let earlierHead = null;
 
@@ -1150,6 +1177,8 @@ function sortGrid() {
   });
   // Moving a card reloads its iframe, so this only runs on load and when the sort changes.
   // Earlier writings always come last, behind their folder row.
+  listHead ||= makeListHead();
+  el.grid.append(listHead);
   for (const site of sorted.filter(s => !s.earlier)) el.grid.append(state.cards.get(site.id));
   earlierHead ||= makeEarlierHead();
   el.grid.append(earlierHead);
@@ -1251,6 +1280,13 @@ function initControls() {
     state.kind = ['all', 'place', 'tool', 'writing'].includes(kind) ? kind : 'all';
     el.kindButtons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.kind === state.kind)));
     el.layout.dataset.kind = state.kind;
+    if (state.kind !== 'writing') {
+      // covers were skipped while the list was shown; draw them for the cards in view
+      for (const id of state.visible) {
+        const site = state.byId.get(id);
+        if (site?.kind === 'writing' && !site.previewKind) resolvePreview(site, state.cards.get(id));
+      }
+    }
     el.viewGroup.hidden = state.kind === 'writing' || state.kind === 'tool';
     store.set('hub:kind', state.kind);
     requestAnimationFrame(() => map?.resize());

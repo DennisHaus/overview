@@ -386,6 +386,65 @@ button, input, select { font: inherit; color: inherit; }
   overflow: hidden;
 }
 
+/* ---------- Writings as a list (Writings view) ---------- */
+.card .w-authors,
+.card .w-year,
+.list-head { display: none; }
+
+.layout[data-kind="writing"] .grid { display: block; }
+
+.layout[data-kind="writing"] .card {
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+
+.layout[data-kind="writing"] .card .preview,
+.layout[data-kind="writing"] .card .place,
+.layout[data-kind="writing"] .card .desc { display: none; }
+
+.layout[data-kind="writing"] .card .meta,
+.layout[data-kind="writing"] .list-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 6ch;
+  gap: 4px 28px;
+  align-items: baseline;
+  padding: 13px 6px;
+}
+
+.layout[data-kind="writing"] .list-head {
+  padding-top: 4px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line-strong);
+  color: var(--muted);
+  font-size: .75rem;
+}
+
+.layout[data-kind="writing"] .list-head span:last-child,
+.layout[data-kind="writing"] .card .w-year { text-align: right; }
+
+.layout[data-kind="writing"] .card .w-authors,
+.layout[data-kind="writing"] .card .w-year {
+  display: block;
+  color: var(--muted);
+  font-size: .82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.layout[data-kind="writing"] .card[href]:hover { background: var(--card); }
+.layout[data-kind="writing"] .card[href]:hover .title { text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+.layout[data-kind="writing"] .card:not([href]) .title { color: var(--muted); }   /* listed, nothing to open yet */
+.layout[data-kind="writing"] .card:hover { border-color: var(--line); }
+.layout[data-kind="writing"] .group-head { margin-top: 24px; padding-left: 6px; }
+
+@media (max-width: 700px) {
+  .layout[data-kind="writing"] .card .meta,
+  .layout[data-kind="writing"] .list-head { grid-template-columns: minmax(0, 1fr) 6ch; }
+  .layout[data-kind="writing"] .card .w-authors { grid-row: 2; grid-column: 1 / -1; }
+  .layout[data-kind="writing"] .list-head span:nth-child(2) { display: none; }
+}
+
 /* ---------- Folder of earlier writings ---------- */
 .group-head {
   grid-column: 1 / -1;
