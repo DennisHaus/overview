@@ -562,7 +562,8 @@ function buildWriting(entry, used) {
 
   const authors = Array.isArray(entry.authors) ? entry.authors.join(', ')
     : (entry.authors || cslNames(entry.author).join(', '));
-  const venue = entry.venue || entry['container-title'] || entry.publisher || '';
+  const venue = entry.venue || entry['container-title'] || '';
+  const publisher = entry.publisher || '';
   const description = entry.description || '';
   const doi = String(entry.DOI || '').replace(/^https?:\/\/(dx\.)?doi\.org\//i, '').trim();
   const link = doi ? `https://doi.org/${doi}` : (isUrl(entry.URL) ? entry.URL : '');
@@ -574,6 +575,7 @@ function buildWriting(entry, used) {
     title,
     authors,
     venue,
+    publisher,
     year,
     description,
     pages: 0,
@@ -586,7 +588,7 @@ function buildWriting(entry, used) {
     cover: entry.cover ? new URL(entry.cover, location.href).href : '',
     previews: [],
     updated: entry.date || issued?.date || (year ? `${year}-01-01` : ''),
-    searchText: norm([title, entry['title-short'], authors, venue, year, description, stem, doi,
+    searchText: norm([title, entry['title-short'], authors, venue, publisher, year, description, stem, doi,
       'writing writings publication paper pdf'].join(' ')),
   };
 }
@@ -619,8 +621,15 @@ async function loadWritings() {
   return { writings: entries.map(e => buildWriting(e, used)), note };
 }
 
+const pageCount = n => n ? `${n} ${n === 1 ? 'page' : 'pages'}` : '';
+
 function writingDetails(site) {
-  return [site.venue, site.year, site.pages && `${site.pages} ${site.pages === 1 ? 'page' : 'pages'}`].filter(Boolean).join(', ');
+  return [site.venue || site.publisher, site.year, pageCount(site.pages)].filter(Boolean).join(', ');
+}
+
+// Reader header: journal or book, publisher, year and length
+function publicationLine(site) {
+  return [site.venue, site.publisher, site.year, pageCount(site.pages)].filter(Boolean).join(', ');
 }
 
 /* ---------- PDF.js, loaded only when a writing is shown ---------- */
@@ -1206,7 +1215,8 @@ const reader = {
   dialog: $('#reader'),
   pages: $('#reader-pages'),
   title: $('#reader-title'),
-  meta: $('#reader-meta'),
+  authors: $('#reader-authors'),
+  pub: $('#reader-pub'),
   page: $('#reader-page'),
   download: $('#reader-download'),
   source: $('#reader-source'),
@@ -1382,7 +1392,8 @@ async function openReader(site) {
   setZoomPressed();
 
   reader.title.textContent = site.title;
-  reader.meta.textContent = [site.authors, site.venue, site.year].filter(Boolean).join(', ');
+  reader.authors.textContent = site.authors;
+  reader.pub.textContent = publicationLine(site);
   reader.download.href = site.file;
   reader.download.setAttribute('download', site.fileName);
   reader.source.hidden = !site.link;
@@ -1402,6 +1413,8 @@ async function openReader(site) {
     if (token !== reader.token) return;
 
     const vp = first.getViewport({ scale: 1 });
+    site.pages = pdf.numPages;
+    reader.pub.textContent = publicationLine(site);
     reader.pdf = pdf;
     reader.ratio = vp.height / vp.width;
     reader.width = fitWidth();

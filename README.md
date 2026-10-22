@@ -11,7 +11,7 @@ Doctoral research by Dennis Häusler, Professur Voser, Institute for Landscape a
 | `hub.html` | Panels and map of all websites, plus the writings and the PDF reader |
 | `app.js` | Everything the hub does. Settings are at the top in `CONFIG` |
 | `style.css` | Styles for both pages |
-| `landing.js` | The moving water line on the start page |
+| `landing.js` | The live station graph on the start page. Settings are at the top in `GAUGE` |
 | `writings.json` | Titles, authors and years of the PDFs |
 | `writings/` | The PDF files |
 
@@ -19,6 +19,20 @@ Links into the hub:
 
 - `hub.html?kind=place`, `?kind=tool`, `?kind=writing` open with that filter
 - `hub.html?read=<id>` opens a writing in the reader straight away (the address bar shows this link while you read, so you can copy and share it)
+
+## Live station graph on the start page
+
+The line at the bottom of the start page shows the last seven days of a random Swiss station: a river or lake gauge of the Federal Office for the Environment (FOEN) or a MeteoSwiss weather station. Visitors can search for a station by river, lake, town, canton or station number, switch between the measurements a station records, and hover over the line to read values. The data refresh every ten minutes.
+
+The data come from [api.existenz.ch](https://api.existenz.ch), a free service that republishes the official FOEN and MeteoSwiss readings. Station lists are kept in the visitor's browser for a day, so a visit usually costs only one request for the readings. If the service cannot be reached, the line falls back to a simulated water level and says so.
+
+Settings at the top of `landing.js`:
+
+| Setting | Meaning |
+| --- | --- |
+| `days` | How many days of readings are drawn (up to 31) |
+| `hydroShare` | Share of random picks that are river and lake stations rather than weather stations |
+| `refreshMinutes` | How often the shown station is updated |
 
 ## Adding a writing
 
