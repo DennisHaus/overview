@@ -22,16 +22,20 @@ Links into the hub:
 
 ## Live station graph on the start page
 
-The line at the bottom of the start page shows the last seven days of a random Swiss station: a river or lake gauge of the Federal Office for the Environment (FOEN) or a MeteoSwiss weather station. Visitors can search for a station by river, lake, town, canton or station number, switch between the measurements a station records, and hover over the line to read values. The data refresh every ten minutes.
+The graph at the bottom of the start page shows the last seven days of a Swiss river or lake station of the Federal Office for the Environment (FOEN), together with the nearest MeteoSwiss weather station within 30 km. Water level, discharge, water temperature and air temperature are drawn on the same time axis, each scaled to its own range; precipitation hangs from the top as hourly bars, as in a hydrograph. All measurements are shown at first; each one can be switched off and on with its button, which also shows the latest value. Hovering shows every value at that moment. Visitors can search for a station by river, lake, town or station number. The data refresh every ten minutes.
 
-The data come from [api.existenz.ch](https://api.existenz.ch), a free service that republishes the official FOEN and MeteoSwiss readings. Station lists are kept in the visitor's browser for a day, so a visit usually costs only one request for the readings. If the service cannot be reached, the line falls back to a simulated water level and says so.
+Random picks favour the stations in `focus`: the rivers of the case study areas (Linth, Kander, Albula, Lonza, upper Aare) and glacier-fed rivers. Each focus entry matches stations by water body and, optionally, place name, and its label appears next to the station name.
+
+The data come from [api.existenz.ch](https://api.existenz.ch), a free service that republishes the official FOEN and MeteoSwiss readings. Station lists are kept in the visitor's browser for a day. If the service cannot be reached, the line falls back to a simulated water level and says so.
 
 Settings at the top of `landing.js`:
 
 | Setting | Meaning |
 | --- | --- |
 | `days` | How many days of readings are drawn (up to 31) |
-| `hydroShare` | Share of random picks that are river and lake stations rather than weather stations |
+| `weatherWithinKm` | Farthest weather station that is still paired with a river or lake station |
+| `focusShare` | Share of random picks taken from the focus stations |
+| `focus` | The focus stations and their labels |
 | `refreshMinutes` | How often the shown station is updated |
 
 ## Adding a writing

@@ -2,49 +2,58 @@
 
 /* =====================================================================
    Live water line on the start page.
-   Readings from a random Swiss river, lake or weather station for the
-   last few days, drawn as a water level. Data: FOEN (hydrology) and
-   MeteoSwiss (SwissMetNet), served by api.existenz.ch.
+   A Swiss river or lake station (FOEN) over the last days, together with
+   the nearest MeteoSwiss weather station. All measurements are drawn on
+   the same time axis, each scaled to its own range; precipitation hangs
+   from the top as bars, as in a hydrograph. Data: api.existenz.ch.
    ===================================================================== */
 const GAUGE = {
   api: 'https://api.existenz.ch/apiv1',
   app: 'entwerfen-in-der-zeit',     // Existenz asks apps to name themselves
-  days: 7,                          // length of the series shown
-  hydroShare: 0.7,                  // share of random picks that are river and lake stations
+  days: 7,                          // length of the series shown (up to 31)
+  weatherWithinKm: 30,              // farthest weather station that is still paired
+  focusShare: 0.8,                  // share of random picks taken from the focus stations below
   refreshMinutes: 10,
   cacheHours: 24,                   // station lists are kept this long in the browser
+
+  // Stations shown more often, matched by water body and place name.
+  // The label appears under the station name.
+  focus: [
+    { label: 'Case study area: Linth plain', water: ['linth', 'escherkanal', 'linthkanal'] },
+    { label: 'Case study area: Kandersteg', water: ['kander'] },
+    { label: 'Case study area: Brienz/Brinzauls', water: ['albula'] },
+    { label: 'Case study area: Blatten (Lötschental)', water: ['lonza'] },
+    { label: 'Case study area: Grimsel and the upper Aare', water: ['aare'], place: ['guttannen', 'handeck', 'innertkirchen', 'meiringen', 'brienzwiler', 'grimsel'] },
+    { label: 'Glacier-fed river', water: ['rhone'], place: ['gletsch', 'reckingen', 'oberwald', 'brig'] },
+    { label: 'Glacier-fed river', water: ['massa', 'lutschine', 'vispa', 'rosegbach', 'roseg', 'gornera', 'drance', 'navisence', 'borgne', 'reuss'], place: ['blatten', 'gsteig', 'zweilutschinen', 'visp', 'zermatt', 'saas', 'pontresina', 'andermatt', 'vissoie', 'bramois', 'martigny', 'brig'] },
+  ],
 };
 
-// Readable names for the parameter codes. Unknown codes use the API's own description.
-const PARAM_LABELS = {
-  hydro: {
-    height: 'Water level', height_abs: 'Water level', flow: 'Discharge', flow_ls: 'Discharge',
-    temperature: 'Water temperature',
-  },
-  smn: {
-    tt: 'Air temperature', rr: 'Precipitation', rh: 'Humidity', ff: 'Wind speed', fx: 'Gusts',
-    ss: 'Sunshine', rad: 'Radiation', td: 'Dew point', qfe: 'Air pressure', dd: 'Wind direction',
-  },
-};
-
-// Which measurement to show first
-const PREFERRED = {
-  hydro: ['height', 'height_abs', 'flow', 'flow_ls', 'temperature'],
-  smn: ['tt', 'rr', 'rh', 'ff'],
-};
+// Measurements that are drawn, in order. Others the stations may report are left out.
+const SERIES = [
+  { key: 'hydro:height', label: 'Water level', cls: 's-level', primary: true },
+  { key: 'hydro:height_abs', label: 'Water level', cls: 's-level', primary: true },
+  { key: 'hydro:flow', label: 'Discharge', cls: 's-flow', primary: true },
+  { key: 'hydro:flow_ls', label: 'Discharge', cls: 's-flow', primary: true },
+  { key: 'hydro:temperature', label: 'Water temperature', cls: 's-wtemp' },
+  { key: 'smn:tt', label: 'Air temperature', cls: 's-air', weather: true },
+  { key: 'smn:rr', label: 'Precipitation', cls: 's-rain', weather: true, bars: true },
+];
 
 const W = 1200;
 const H = 200;
-const TOP = 78;      // highest point of the line (room for the station name above)
-const BOTTOM = 186;  // lowest point of the line
+const LINE_TOP = 64;     // lines stay below the precipitation bars
+const LINE_BOTTOM = 190;
+const RAIN_DEPTH = 52;   // tallest precipitation bar
 
 /* ---------- helpers ---------- */
 const $ = id => document.getElementById(id);
+const SVG = 'http://www.w3.org/2000/svg';
 const still = matchMedia('(prefers-reduced-motion: reduce)');
 
 const norm = v => String(v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-
+const num = v => (v === null || v === undefined || v === '' ? NaN : Number(v));
 const unitLabel = u => String(u || '').replace(/m3/g, 'm³');
 
 const timeFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Zurich', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -53,8 +62,9 @@ const dayFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Zurich', day
 // Water levels move by centimetres, so metres always keep two decimals
 function formatValue(v, unit = '') {
   const abs = Math.abs(v);
-  const digits = unit === 'm' ? 2 : abs >= 1000 ? 0 : abs >= 10 ? 1 : 2;
-  return v.toLocaleString('en-GB', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  const digits = unit === 'm' ? 2 : unit === 'mm' ? 1 : abs >= 1000 ? 0 : abs >= 10 ? 1 : abs >= 1 ? 1 : 2;
+  const text = v.toLocaleString('en-GB', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  return unit ? `${text} ${unit}` : text;
 }
 
 function fetchWithTimeout(url, ms = 10000) {
@@ -97,7 +107,18 @@ const entriesOf = json => {
   return Object.entries(p || {});
 };
 
-/* ---------- stations and parameters ---------- */
+/* ---------- stations ---------- */
+function themeOf(water, place) {
+  const w = norm(water);
+  const p = norm(place);
+  for (const f of GAUGE.focus) {
+    const waterHit = f.water.some(x => w === x || w.startsWith(`${x} `) || w.endsWith(` ${x}`));
+    const placeHit = !f.place || f.place.some(x => p.includes(x));
+    if (waterHit && placeHit) return f.label;
+  }
+  return '';
+}
+
 function parseStations(json, kind) {
   return entriesOf(json).map(([key, v]) => {
     const d = v?.details || v || {};
@@ -106,70 +127,94 @@ function parseStations(json, kind) {
     const water = String(d['water-body-name'] ?? '').trim();
     const type = String(d['water-body-type'] ?? '').trim();
     const canton = String(d.canton ?? '').trim();
+    const lat = num(d.lat ?? d.latitude);
+    const lon = num(d.lon ?? d.lng ?? d.longitude);
+    const chx = num(d.chx ?? d.x);
+    const chy = num(d.chy ?? d.y);
 
     const title = kind === 'hydro' ? (water && water !== place ? `${water}, ${place}` : place) : place;
-    const what = kind === 'hydro'
-      ? `${type === 'lake' ? 'Lake' : 'River'} station ${id}, FOEN`
-      : `Weather station ${id}${canton ? `, ${canton}` : ''}, MeteoSwiss`;
+    const what = kind === 'hydro' ? `${type === 'lake' ? 'Lake' : 'River'} station ${id}, FOEN` : `Weather station ${id}, MeteoSwiss`;
+    const theme = kind === 'hydro' ? themeOf(water, place) : '';
 
-    return { kind, id, title, what, search: norm(`${title} ${place} ${water} ${canton} ${id} ${kind === 'hydro' ? type : 'weather'}`) };
+    return {
+      kind, id, title, place, what, theme, lat, lon, chx, chy,
+      search: norm(`${title} ${place} ${water} ${canton} ${id} ${type} ${theme}`),
+    };
   }).filter(s => s.id);
 }
 
 function parseParams(json) {
   const out = {};
-  for (const [key, v] of entriesOf(json)) {
-    if (!key) continue;
-    out[key] = { unit: v?.unit || '', description: v?.description || v?.name || key };
-  }
+  for (const [key, v] of entriesOf(json)) if (key) out[key] = { unit: v?.unit || '' };
   return out;
 }
 
 async function loadCatalogue() {
   const [hydro, smn, hydroParams, smnParams] = await Promise.all([
-    cached('gauge:hydro:stations', async () => parseStations(await api('/hydro/locations'), 'hydro')),
-    cached('gauge:smn:stations', async () => parseStations(await api('/smn/locations'), 'smn')).catch(() => []),
-    cached('gauge:hydro:params', async () => parseParams(await api('/hydro/parameters'))).catch(() => ({})),
-    cached('gauge:smn:params', async () => parseParams(await api('/smn/parameters'))).catch(() => ({})),
+    cached('gauge2:hydro:stations', async () => parseStations(await api('/hydro/locations'), 'hydro')),
+    cached('gauge2:smn:stations', async () => parseStations(await api('/smn/locations'), 'smn')).catch(() => []),
+    cached('gauge2:hydro:params', async () => parseParams(await api('/hydro/parameters'))).catch(() => ({})),
+    cached('gauge2:smn:params', async () => parseParams(await api('/smn/parameters'))).catch(() => ({})),
   ]);
-  return { stations: { hydro, smn }, params: { hydro: hydroParams, smn: smnParams } };
+  return { hydro, smn, units: { hydro: hydroParams, smn: smnParams } };
+}
+
+// Distance in km from coordinates, or from Swiss grid coordinates when those are all there is
+function distanceKm(a, b) {
+  if ([a.lat, a.lon, b.lat, b.lon].every(Number.isFinite)) {
+    const rad = d => d * Math.PI / 180;
+    const h = Math.sin(rad(b.lat - a.lat) / 2) ** 2 +
+      Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lon - a.lon) / 2) ** 2;
+    return 12742 * Math.asin(Math.sqrt(h));
+  }
+  if ([a.chx, a.chy, b.chx, b.chy].every(Number.isFinite)) {
+    const scale = v => (v > 1e6 ? v - (v > 1.5e6 ? 2e6 : 1e6) : v); // LV95 to LV03
+    return Math.hypot(scale(a.chx) - scale(b.chx), scale(a.chy) - scale(b.chy)) / 1000;
+  }
+  return Infinity;
+}
+
+function nearestWeather(station) {
+  let best = null;
+  let bestKm = GAUGE.weatherWithinKm;
+  for (const w of state.catalogue.smn) {
+    const km = distanceKm(station, w);
+    if (km < bestKm) { best = w; bestKm = km; }
+  }
+  return best ? { station: best, km: bestKm } : null;
 }
 
 // Readings of one station: { code: [[ms, value], …] } sorted by time
-async function loadSeries(station) {
-  const json = await api(`/${station.kind}/daterange`, {
-    locations: station.id,
-    startdate: `-${GAUGE.days} days`,
-    enddate: 'now',
-  });
-  const series = {};
+async function loadReadings(kind, id) {
+  const json = await api(`/${kind}/daterange`, { locations: id, startdate: `-${GAUGE.days} days`, enddate: 'now' });
+  const out = {};
   for (const row of Array.isArray(json?.payload) ? json.payload : []) {
-    const value = Number(row.val);
-    const t = Number(row.timestamp) * 1000;
-    if (!row.par || row.val === null || !Number.isFinite(value) || !Number.isFinite(t)) continue;
-    (series[row.par] ||= []).push([t, value]);
+    const value = num(row.val);
+    const t = num(row.timestamp) * 1000;
+    if (!row.par || !Number.isFinite(value) || !Number.isFinite(t)) continue;
+    (out[row.par] ||= []).push([t, value]);
   }
-  for (const list of Object.values(series)) list.sort((a, b) => a[0] - b[0]);
-  return series;
+  for (const list of Object.values(out)) list.sort((a, b) => a[0] - b[0]);
+  return out;
 }
 
-/* ---------- drawing ---------- */
+/* ---------- state and elements ---------- */
 const el = {
   gauge: $('gauge'),
-  line: $('g-line'),
+  plot: $('gauge-plot'),
+  rain: $('g-rain'),
+  lines: $('g-lines'),
   fill: $('g-fill'),
   mean: $('g-mean'),
   dot: $('g-dot'),
   cursor: $('g-cursor'),
   readout: $('g-readout'),
   title: $('gauge-title'),
+  theme: $('gauge-theme'),
   sub: $('gauge-sub'),
-  value: $('gauge-value'),
-  time: $('gauge-time'),
-  params: $('gauge-params'),
+  series: $('gauge-series'),
   from: $('gauge-from'),
   to: $('gauge-to'),
-  meanLabel: $('gauge-mean-label'),
   q: $('gauge-q'),
   results: $('gauge-results'),
   next: $('gauge-next'),
@@ -178,146 +223,219 @@ const el = {
 const state = {
   catalogue: null,
   station: null,
-  series: null,
-  param: null,
-  points: [],        // [{ t, v, x, y }]
+  weather: null,
+  series: [],          // [{ def, unit, data, points, hourly }]
+  selected: new Set(),
+  t0: 0,
+  t1: 0,
   token: 0,
 };
+
+/* ---------- drawing ---------- */
+const xOf = t => ((t - state.t0) / (state.t1 - state.t0 || 1)) * W;
+
+function scaleFor(data) {
+  let lo = Infinity;
+  let hi = -Infinity;
+  let sum = 0;
+  for (const [, v] of data) { lo = Math.min(lo, v); hi = Math.max(hi, v); sum += v; }
+  const span = hi - lo || Math.max(Math.abs(hi) * 0.01, 1);
+  const pad = span * 0.08;
+  return { mean: sum / data.length, y: v => LINE_BOTTOM - ((v - (lo - pad)) / (span + 2 * pad)) * (LINE_BOTTOM - LINE_TOP) };
+}
 
 function pathFrom(points) {
   let d = '';
   let last = null;
-  const gap = 3 * 3600000; // a gap of more than 3 hours breaks the line
   for (const p of points) {
-    d += `${!last || p.t - last.t > gap ? 'M' : 'L'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`;
+    d += `${!last || p.t - last.t > 3 * 3600000 ? 'M' : 'L'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`; // gaps over 3 h break the line
     last = p;
   }
   return d;
 }
 
-function draw(animate) {
-  const list = state.series?.[state.param] || [];
-  if (list.length < 2) return;
-
-  const t0 = list[0][0];
-  const t1 = list[list.length - 1][0];
-  let lo = Infinity;
-  let hi = -Infinity;
-  let sum = 0;
-  for (const [, v] of list) { lo = Math.min(lo, v); hi = Math.max(hi, v); sum += v; }
-  const mean = sum / list.length;
-  const span = hi - lo || Math.max(Math.abs(hi) * 0.01, 1);
-  const pad = span * 0.08;
-  const yOf = v => BOTTOM - ((v - (lo - pad)) / (span + 2 * pad)) * (BOTTOM - TOP);
-
-  state.points = list.map(([t, v]) => ({ t, v, x: ((t - t0) / (t1 - t0 || 1)) * W, y: yOf(v) }));
-  const first = state.points[0];
-  const last = state.points[state.points.length - 1];
-
-  el.line.setAttribute('d', pathFrom(state.points));
-  el.fill.setAttribute('d', `M${first.x} ${H}L${state.points.map(p => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join('L')}L${last.x} ${H}Z`);
-  const my = yOf(mean).toFixed(1);
-  el.mean.setAttribute('y1', my);
-  el.mean.setAttribute('y2', my);
-
-  // the latest reading, pulsing at the right end
-  el.dot.hidden = false;
-  el.dot.style.left = `min(${(last.x / W) * 100}%, calc(100% - 12px))`;
-  el.dot.style.top = `${(last.y / H) * 100}%`;
-
-  const unit = unitLabel(state.catalogue.params[state.station.kind][state.param]?.unit);
-  const withUnit = v => `${formatValue(v, unit)}${unit ? ` ${unit}` : ''}`;
-  el.value.textContent = withUnit(last.v);
-  el.time.textContent = timeFmt.format(last.t);
-  el.from.textContent = dayFmt.format(t0);
-  el.to.textContent = Date.now() - t1 < 2 * 3600000 ? 'now' : dayFmt.format(t1);
-  el.meanLabel.textContent = `Mean ${withUnit(mean)}`;
-
-  if (animate && !still.matches) {
-    // the stroke is drawn in screen pixels, so the dash has to be measured in pixels too
-    const box = el.line.ownerSVGElement.getBoundingClientRect();
-    const length = el.line.getTotalLength() * Math.max(box.width / W, box.height / H) * 1.05;
-    el.line.style.transition = 'none';
-    el.line.style.strokeDasharray = `${length}`;
-    el.line.style.strokeDashoffset = `${length}`;
-    el.fill.style.transition = 'none';
-    el.fill.style.opacity = '0';
-    el.line.getBoundingClientRect(); // apply the start state before animating
-    el.line.style.transition = 'stroke-dashoffset 1.6s cubic-bezier(.4, 0, .2, 1)';
-    el.line.style.strokeDashoffset = '0';
-    el.fill.style.transition = 'opacity 1.2s ease .4s';
-    el.fill.style.opacity = '';
-    el.line.addEventListener('transitionend', () => {
-      el.line.style.strokeDasharray = '';
-      el.line.style.strokeDashoffset = '';
-    }, { once: true });
-  } else {
-    el.line.style.transition = el.fill.style.transition = 'none';
-    el.line.style.strokeDasharray = '';
-    el.line.style.strokeDashoffset = '';
-    el.fill.style.opacity = '';
+// 10-minute precipitation summed per hour
+function hourly(data) {
+  const sums = new Map();
+  for (const [t, v] of data) {
+    const hour = Math.floor(t / 3600000) * 3600000;
+    sums.set(hour, (sums.get(hour) || 0) + v);
   }
+  return [...sums.entries()].sort((a, b) => a[0] - b[0]);
 }
 
-function labelFor(kind, code) {
-  return PARAM_LABELS[kind][code] || state.catalogue.params[kind][code]?.description || code;
+function revealLine(path) {
+  const box = path.ownerSVGElement.getBoundingClientRect();
+  const length = path.getTotalLength() * Math.max(box.width / W, box.height / H) * 1.05;
+  path.style.strokeDasharray = `${length}`;
+  path.style.strokeDashoffset = `${length}`;
+  path.getBoundingClientRect();
+  path.style.transition = 'stroke-dashoffset 1.6s cubic-bezier(.4, 0, .2, 1)';
+  path.style.strokeDashoffset = '0';
+  path.addEventListener('transitionend', () => {
+    path.style.strokeDasharray = '';
+    path.style.strokeDashoffset = '';
+  }, { once: true });
 }
 
-function renderParams() {
-  const kind = state.station.kind;
-  const codes = Object.keys(state.series).filter(c => state.series[c].length > 1);
-  const pref = PREFERRED[kind];
-  codes.sort((a, b) => (pref.indexOf(a) + 1 || 99) - (pref.indexOf(b) + 1 || 99));
-  el.params.replaceChildren(...codes.slice(0, 5).map(code => {
+function draw(animate) {
+  const shown = state.series.filter(s => state.selected.has(s.def.key));
+  el.lines.replaceChildren();
+  el.rain.replaceChildren();
+  el.fill.setAttribute('d', '');
+  el.mean.style.display = 'none';
+  el.dot.hidden = true;
+
+  const primary = shown.find(s => s.def.primary);
+  const motion = animate && !still.matches;
+
+  for (const s of shown) {
+    if (s.def.bars) {
+      const max = Math.max(2, ...s.hourly.map(([, v]) => v)); // 2 mm/h keeps drizzle small
+      const width = Math.max((3600000 / (state.t1 - state.t0)) * W, 1);
+      for (const [t, v] of s.hourly) {
+        if (v <= 0 || t < state.t0) continue;
+        const r = document.createElementNS(SVG, 'rect');
+        r.setAttribute('x', xOf(t).toFixed(1));
+        r.setAttribute('y', '0');
+        r.setAttribute('width', width.toFixed(2));
+        r.setAttribute('height', ((v / max) * RAIN_DEPTH).toFixed(1));
+        r.setAttribute('class', `g-bar ${s.def.cls}`);
+        el.rain.append(r);
+      }
+      continue;
+    }
+
+    const scale = scaleFor(s.data);
+    s.points = s.data.filter(([t]) => t >= state.t0).map(([t, v]) => ({ t, v, x: xOf(t), y: scale.y(v) }));
+    if (s.points.length < 2) continue;
+
+    const path = document.createElementNS(SVG, 'path');
+    path.setAttribute('d', pathFrom(s.points));
+    path.setAttribute('class', `g-line ${s.def.cls}${s.def.weather ? ' is-weather' : ''}`);
+    el.lines.append(path);
+
+    if (s === primary) {
+      const pts = s.points;
+      el.fill.setAttribute('d', `M${pts[0].x} ${H}L${pts.map(p => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join('L')}L${pts[pts.length - 1].x} ${H}Z`);
+      const my = scale.y(scale.mean).toFixed(1);
+      el.mean.setAttribute('y1', my);
+      el.mean.setAttribute('y2', my);
+      el.mean.style.display = '';
+      const last = pts[pts.length - 1];
+      el.dot.hidden = false;
+      el.dot.style.left = `min(${(last.x / W) * 100}%, calc(100% - 12px))`;
+      el.dot.style.top = `${(last.y / H) * 100}%`;
+    }
+    if (motion) revealLine(path);
+  }
+
+  el.gauge.classList.toggle('is-revealing', motion);
+  if (motion) setTimeout(() => el.gauge.classList.remove('is-revealing'), 50);
+
+  el.from.textContent = dayFmt.format(state.t0);
+  el.to.textContent = Date.now() - state.t1 < 2 * 3600000 ? 'now' : dayFmt.format(state.t1);
+}
+
+function latestText(s) {
+  if (s.def.bars) {
+    const total = s.data.filter(([t]) => t >= state.t1 - 86400000).reduce((a, [, v]) => a + v, 0);
+    return `${formatValue(total, s.unit)} in 24 h`;
+  }
+  return formatValue(s.data[s.data.length - 1][1], s.unit);
+}
+
+// The legend doubles as the switch: every measurement can be shown or hidden, all start shown
+function renderLegend() {
+  el.series.replaceChildren(...state.series.map(s => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.textContent = labelFor(kind, code);
-    b.setAttribute('aria-pressed', String(code === state.param));
+    b.className = `gauge-chip ${s.def.cls}${s.def.weather ? ' is-weather' : ''}`;
+    b.setAttribute('aria-pressed', String(state.selected.has(s.def.key)));
+    const swatch = document.createElement('span');
+    swatch.className = 'chip-swatch';
+    swatch.setAttribute('aria-hidden', 'true');
+    const label = document.createElement('span');
+    label.textContent = s.def.label;
+    const value = document.createElement('span');
+    value.className = 'chip-value';
+    value.textContent = latestText(s);
+    b.append(swatch, label, value);
     b.addEventListener('click', () => {
-      state.param = code;
-      renderParams();
-      draw(true);
+      if (state.selected.has(s.def.key)) state.selected.delete(s.def.key);
+      else state.selected.add(s.def.key);
+      b.setAttribute('aria-pressed', String(state.selected.has(s.def.key)));
+      draw(false);
     });
     return b;
   }));
 }
 
+/* ---------- loading a station ---------- */
 async function showStation(station, { quiet = false } = {}) {
   const token = ++state.token;
+  const weather = nearestWeather(station);
+
   if (!quiet) {
     el.title.textContent = station.title;
-    el.sub.textContent = station.what;
-    el.value.textContent = '';
-    el.time.textContent = 'Loading readings…';
+    el.theme.hidden = !station.theme;
+    el.theme.textContent = station.theme;
+    el.sub.textContent = 'Loading readings…';
   }
-  const series = await loadSeries(station);
+
+  const [hydro, smn] = await Promise.all([
+    loadReadings('hydro', station.id),
+    weather ? loadReadings('smn', weather.station.id).catch(() => ({})) : Promise.resolve({}),
+  ]);
   if (token !== state.token) return false;
 
-  const codes = Object.keys(series).filter(c => series[c].length > 1);
-  if (!codes.length) {
-    if (!quiet) el.time.textContent = 'No recent readings from this station.';
+  const readings = { hydro, smn };
+  const series = [];
+  const seen = new Set();
+  for (const def of SERIES) {
+    const [kind, code] = def.key.split(':');
+    const data = readings[kind][code];
+    if (!data || data.length < 2 || seen.has(def.label)) continue; // one water level, one discharge
+    seen.add(def.label);
+    series.push({ def, unit: unitLabel(state.catalogue.units[kind][code]?.unit), data, points: [], hourly: def.bars ? hourly(data) : [] });
+  }
+
+  if (!series.some(s => !s.def.weather)) {
+    if (!quiet) el.sub.textContent = 'No recent readings from this station.';
     return false;
   }
 
   stopSynthetic();
-  const keep = quiet && state.station?.id === station.id && codes.includes(state.param);
+  const sameStation = quiet && state.station?.id === station.id;
   state.station = station;
+  state.weather = weather;
   state.series = series;
-  if (!keep) state.param = PREFERRED[station.kind].find(c => codes.includes(c)) || codes[0];
+  if (!sameStation) state.selected = new Set(series.map(s => s.def.key));
+
+  state.t1 = Math.max(...series.map(s => s.data[s.data.length - 1][0]));
+  state.t0 = state.t1 - GAUGE.days * 86400000;
 
   el.gauge.dataset.state = 'live';
   el.title.textContent = station.title;
-  el.sub.textContent = station.what;
-  renderParams();
+  el.theme.hidden = !station.theme;
+  el.theme.textContent = station.theme;
+  const hasWeather = series.some(s => s.def.weather);
+  el.sub.textContent = hasWeather
+    ? `${station.what}, with weather from ${weather.station.place}, ${Math.round(weather.km)} km away (MeteoSwiss)`
+    : `${station.what}${weather ? '' : `, no weather station within ${GAUGE.weatherWithinKm} km`}`;
+
+  renderLegend();
   draw(!quiet);
   return true;
 }
 
 async function showRandom() {
-  const { hydro, smn } = state.catalogue.stations;
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const pool = smn.length && Math.random() > GAUGE.hydroShare ? smn : hydro;
-    const station = pool[Math.floor(Math.random() * pool.length)];
+  const all = state.catalogue.hydro;
+  const focus = all.filter(s => s.theme);
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const pool = focus.length && Math.random() < GAUGE.focusShare ? focus : all;
+    let station = pool[Math.floor(Math.random() * pool.length)];
+    if (station?.id === state.station?.id && pool.length > 1) station = pool[(pool.indexOf(station) + 1) % pool.length];
     try {
       if (station && await showStation(station)) return;
     } catch { /* try another station */ }
@@ -327,21 +445,25 @@ async function showRandom() {
 
 /* ---------- simulated line, while loading or when the data cannot be reached ---------- */
 let synthFrame = null;
+let synthPath = null;
 
 function synthetic(t) {
-  const STEP = 8;
   let d = '';
-  for (let x = 0; x <= W; x += STEP) {
+  for (let x = 0; x <= W; x += 8) {
     const u = x / W;
     const y = 130 + 8 * Math.sin(t * 0.05) + 26 * Math.sin(u * Math.PI * 4 - t * 0.35)
       + 6 * Math.sin(u * Math.PI * 23 - t * 1.1) + 2.5 * Math.sin(u * Math.PI * 57 + t * 0.7);
     d += `${x === 0 ? 'M' : 'L'}${x} ${y.toFixed(1)}`;
   }
-  el.line.setAttribute('d', d);
+  synthPath.setAttribute('d', d);
   el.fill.setAttribute('d', `${d}L${W} ${H}L0 ${H}Z`);
 }
 
 function startSynthetic() {
+  el.lines.replaceChildren();
+  synthPath = document.createElementNS(SVG, 'path');
+  synthPath.setAttribute('class', 'g-line s-level');
+  el.lines.append(synthPath);
   let start = null;
   const frame = now => {
     if (start === null) start = now;
@@ -360,39 +482,59 @@ function stopSynthetic() {
 function showUnavailable() {
   el.gauge.dataset.state = 'offline';
   el.title.textContent = 'Simulated water level';
+  el.theme.hidden = true;
   el.sub.textContent = 'Live readings from Swiss stations could not be loaded. Reload the page to try again.';
-  el.value.textContent = '';
-  el.time.textContent = '';
-  el.params.replaceChildren();
+  el.series.replaceChildren();
+  el.rain.replaceChildren();
   el.dot.hidden = true;
-  el.from.textContent = el.to.textContent = el.meanLabel.textContent = '';
+  el.from.textContent = el.to.textContent = '';
   if (!synthFrame) startSynthetic();
 }
 
-/* ---------- reading the line: hover or touch shows the value at that time ---------- */
+/* ---------- reading the graph: hover or touch shows all values at that time ---------- */
+function nearest(list, t, maxGap) {
+  let lo = 0;
+  let hi = list.length - 1;
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (list[mid][0] < t) lo = mid; else hi = mid; }
+  const best = Math.abs(list[lo][0] - t) < Math.abs(list[hi][0] - t) ? list[lo] : list[hi];
+  return Math.abs(best[0] - t) <= maxGap ? best : null;
+}
+
 function initReadout() {
   const hide = () => { el.cursor.hidden = true; el.readout.hidden = true; };
-  el.gauge.addEventListener('pointermove', e => {
-    if (el.gauge.dataset.state !== 'live' || !state.points.length || e.target.closest('.gauge-tools, .gauge-params')) { hide(); return; }
-    const box = el.gauge.getBoundingClientRect();
-    const x = ((e.clientX - box.left) / box.width) * W;
-    const pts = state.points;
-    let lo = 0;
-    let hi = pts.length - 1;
-    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (pts[mid].x < x) lo = mid; else hi = mid; }
-    const p = Math.abs(pts[lo].x - x) < Math.abs(pts[hi].x - x) ? pts[lo] : pts[hi];
-    const unit = unitLabel(state.catalogue.params[state.station.kind][state.param]?.unit);
+  el.plot.addEventListener('pointermove', e => {
+    const shown = state.series.filter(s => state.selected.has(s.def.key));
+    if (el.gauge.dataset.state !== 'live' || !shown.length) { hide(); return; }
+    const box = el.plot.getBoundingClientRect();
+    const ratio = Math.min(Math.max((e.clientX - box.left) / box.width, 0), 1);
+    const t = state.t0 + ratio * (state.t1 - state.t0);
+
+    const rows = [];
+    for (const s of shown) {
+      const hit = s.def.bars ? nearest(s.hourly, Math.floor(t / 3600000) * 3600000, 0) : nearest(s.data, t, 40 * 60000);
+      if (!hit) continue;
+      const row = document.createElement('div');
+      row.className = `readout-row ${s.def.cls}${s.def.weather ? ' is-weather' : ''}`;
+      const sw = document.createElement('span');
+      sw.className = 'chip-swatch';
+      const text = document.createElement('span');
+      text.textContent = `${s.def.label} ${formatValue(hit[1], s.unit)}${s.def.bars ? '/h' : ''}`;
+      row.append(sw, text);
+      rows.push(row);
+    }
+    const head = document.createElement('div');
+    head.className = 'readout-time';
+    head.textContent = timeFmt.format(t);
+    el.readout.replaceChildren(head, ...rows);
 
     el.cursor.hidden = false;
-    el.cursor.style.left = `${(p.x / W) * 100}%`;
+    el.cursor.style.left = `${ratio * 100}%`;
     el.readout.hidden = false;
-    el.readout.textContent = `${formatValue(p.v, unit)}${unit ? ` ${unit}` : ''}, ${timeFmt.format(p.t)}`;
-    const left = (p.x / W) * box.width;
-    const half = el.readout.offsetWidth / 2 + 8;
-    el.readout.style.left = `${Math.min(Math.max(left, half), box.width - half)}px`;
-    el.readout.style.top = `${(p.y / H) * 100}%`;
+    const x = ratio * box.width;
+    const width = el.readout.offsetWidth;
+    el.readout.style.left = `${x + 14 + width > box.width ? x - 14 - width : x + 14}px`;
   });
-  el.gauge.addEventListener('pointerleave', hide);
+  el.plot.addEventListener('pointerleave', hide);
 }
 
 /* ---------- station search ---------- */
@@ -423,13 +565,12 @@ function initSearch() {
   el.q.addEventListener('input', () => {
     const tokens = norm(el.q.value).split(' ').filter(Boolean);
     if (!tokens.length) { close(); return; }
-    const all = [...state.catalogue.stations.hydro, ...state.catalogue.stations.smn];
-    matches = all.filter(s => tokens.every(t => s.search.includes(t))).slice(0, 8);
+    matches = state.catalogue.hydro.filter(s => tokens.every(t => s.search.includes(t))).slice(0, 8);
 
     if (!matches.length) {
       const li = document.createElement('li');
       li.className = 'gauge-empty';
-      li.textContent = 'No station matches. Try a river, lake, town or canton.';
+      li.textContent = 'No station matches. Try a river, lake, town or station number.';
       el.results.replaceChildren(li);
     } else {
       el.results.replaceChildren(...matches.map((s, i) => {
@@ -440,7 +581,7 @@ function initSearch() {
         const name = document.createElement('span');
         name.textContent = s.title;
         const what = document.createElement('small');
-        what.textContent = s.what;
+        what.textContent = s.theme ? `${s.what}. ${s.theme}` : s.what;
         li.append(name, what);
         li.addEventListener('pointerdown', e => { e.preventDefault(); choose(s); });
         return li;
@@ -458,7 +599,6 @@ function initSearch() {
     else if (e.key === 'Escape') { close(); }
   });
   el.q.addEventListener('blur', () => setTimeout(close, 100));
-
   el.next.addEventListener('click', () => showRandom());
 }
 
@@ -471,7 +611,7 @@ async function init() {
     showUnavailable();
     return;
   }
-  if (!state.catalogue.stations.hydro.length) { showUnavailable(); return; }
+  if (!state.catalogue.hydro.length) { showUnavailable(); return; }
 
   el.q.disabled = false;
   el.next.disabled = false;
@@ -483,6 +623,13 @@ async function init() {
   setInterval(() => {
     if (state.station && !document.hidden) showStation(state.station, { quiet: true }).catch(() => {});
   }, GAUGE.refreshMinutes * 60000);
+
+  // redraw when the window changes size, so the line reveal and dot stay in place
+  let timer;
+  window.addEventListener('resize', () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => { if (el.gauge.dataset.state === 'live') draw(false); }, 150);
+  });
 }
 
 init();
