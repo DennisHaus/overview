@@ -15,54 +15,11 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="landing">
-  <main class="intro">
-    <header class="intro-head">
-      <h1>Entwerfen in der Zeit</h1>
-      <p class="intro-sub">Methoden und Konzepte für dynamische Wasserlandschaften der Schweiz</p>
-    </header>
-
-    <div class="intro-text">
-      <p>A doctoral research project by Dennis Häusler at Professur Voser, Institute for Landscape and Urban Studies, ETH Zürich.</p>
-      <p>Swiss water landscapes change over minutes, seasons and decades. Shorelines shift with the water level, alpine slopes creep and break away, and snow and ice hold water back to release it months later. The project develops design methods that work with these changes instead of fixing a single state, through theory, experiments with models, simulations and web tools, and case studies in the plain, the valley and the high Alps.</p>
-    </div>
-
-    <nav class="entries" aria-label="Contents">
-      <a class="entry" href="hub.html?kind=place">
-        <span class="entry-name">Places</span>
-        <span class="entry-desc">Case study and field sites, on a map.</span>
-      </a>
-      <a class="entry" href="hub.html?kind=tool">
-        <span class="entry-name">Tools</span>
-        <span class="entry-desc">Models, simulations and viewers in the browser.</span>
-      </a>
-      <a class="entry" href="hub.html?kind=writing">
-        <span class="entry-name">Writings</span>
-        <span class="entry-desc">Papers to read online or download as PDF.</span>
-      </a>
-    </nav>
-  </main>
-
-  <section class="gauge" id="gauge" aria-labelledby="gauge-title" data-state="loading">
-    <div class="gauge-head">
-      <div class="gauge-info">
-        <h2 class="gauge-title"><span id="gauge-title">Loading a station…</span><span id="gauge-theme" class="gauge-theme" hidden></span></h2>
-        <p id="gauge-sub" class="gauge-sub">Live readings from Swiss rivers and lakes, with the nearest weather station</p>
-      </div>
-      <div class="gauge-tools">
-        <div class="gauge-search">
-          <label class="visually-hidden" for="gauge-q">Search a river or lake station</label>
-          <input id="gauge-q" type="search" placeholder="Search a river or lake" autocomplete="off" spellcheck="false"
-                 role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="gauge-results" disabled>
-          <ul id="gauge-results" class="gauge-results" role="listbox" aria-label="Stations" hidden></ul>
-        </div>
-        <button id="gauge-next" class="gauge-next" type="button" disabled>Another station</button>
-      </div>
-      <div id="gauge-series" class="gauge-series" role="group" aria-label="Shown measurements"></div>
-    </div>
-
-    <div id="gauge-plot" class="gauge-plot">
+  <div class="stage" id="stage">
+    <!-- the live graph sits behind the text -->
+    <div id="gauge-plot" class="gauge-plot" data-state="loading">
       <svg class="gauge-svg" viewBox="0 0 1200 200" preserveAspectRatio="none" aria-hidden="true">
-        <g id="g-rain" class="g-rain"></g>
+        <g id="g-rain"></g>
         <path id="g-fill" class="water-fill" d=""></path>
         <line id="g-mean" class="water-mean" x1="0" y1="120" x2="1200" y2="120"></line>
         <g id="g-lines"></g>
@@ -72,10 +29,51 @@
       <div id="g-readout" class="gauge-readout" hidden></div>
       <p class="gauge-scale"><span id="gauge-from"></span><span id="gauge-to"></span></p>
     </div>
-  </section>
+
+    <main class="intro">
+      <header class="intro-head">
+        <h1><span>Entwerfen</span> <span>in der Zeit</span></h1>
+        <p class="intro-sub">Methoden und Konzepte für dynamische Wasserlandschaften der Schweiz</p>
+      </header>
+
+      <div class="intro-text">
+        <p>A doctoral research project by Dennis Häusler at <a href="https://voser.arch.ethz.ch" target="_blank" rel="noopener">Professur Voser</a>, Institute for Landscape and Urban Studies, ETH Zürich.</p>
+        <p>Swiss water landscapes change over minutes, seasons and decades. Shorelines shift with the water level, alpine slopes creep and break away, and snow and ice hold water back to release it months later. The project develops design methods that work with these changes instead of fixing a single state, through theory, experiments with models, simulations and web tools, and case studies in the plain, the valley and the high Alps.</p>
+      </div>
+
+      <nav class="entries" aria-label="Contents">
+        <a class="entry" href="hub.html?kind=place">
+          <span class="entry-name">Places</span>
+          <span class="entry-desc">Case study and field sites, on a map.</span>
+        </a>
+        <a class="entry" href="hub.html?kind=tool">
+          <span class="entry-name">Tools</span>
+          <span class="entry-desc">Models, simulations and viewers in the browser.</span>
+        </a>
+        <a class="entry" href="hub.html?kind=writing">
+          <span class="entry-name">Writings</span>
+          <span class="entry-desc">Papers to read online or download as PDF.</span>
+        </a>
+      </nav>
+    </main>
+
+    <aside class="gauge-panel" aria-label="Live station data">
+      <div class="gauge-tools">
+        <div class="gauge-search">
+          <label class="visually-hidden" for="gauge-q">Add a station</label>
+          <input id="gauge-q" type="search" placeholder="Add a station" autocomplete="off" spellcheck="false"
+                 role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="gauge-results" disabled>
+          <ul id="gauge-results" class="gauge-results" role="listbox" aria-label="Stations" hidden></ul>
+        </div>
+        <button id="gauge-next" class="gauge-next" type="button" disabled>Another pair</button>
+      </div>
+      <p id="gauge-note" class="gauge-note" role="status">Loading live readings from Swiss stations…</p>
+      <ol id="gauge-stations" class="gauge-stations"></ol>
+    </aside>
+  </div>
 
   <footer class="intro-foot">
-    <p>© ETH Zürich, Institute for Landscape and Urban Studies, Professur Voser</p>
+    <p>© ETH Zürich, Institute for Landscape and Urban Studies, <a href="https://voser.arch.ethz.ch" target="_blank" rel="noopener">Professur Voser</a></p>
     <p>Live data: FOEN and MeteoSwiss, via api.existenz.ch</p>
     <p><a href="mailto:haeusler@arch.ethz.ch">haeusler@arch.ethz.ch</a></p>
   </footer>

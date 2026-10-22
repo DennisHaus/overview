@@ -1,7 +1,7 @@
 # Entwerfen in der Zeit
 
 Methoden und Konzepte für dynamische Wasserlandschaften der Schweiz.
-Doctoral research by Dennis Häusler, Professur Voser, Institute for Landscape and Urban Studies, ETH Zürich.
+Doctoral research by Dennis Häusler, [Professur Voser](https://voser.arch.ethz.ch), Institute for Landscape and Urban Studies, ETH Zürich.
 
 ## Pages
 
@@ -22,9 +22,9 @@ Links into the hub:
 
 ## Live station graph on the start page
 
-The graph at the bottom of the start page shows the last seven days of a Swiss river or lake station of the Federal Office for the Environment (FOEN), together with the nearest MeteoSwiss weather station within 30 km. Water level, discharge, water temperature and air temperature are drawn on the same time axis, each scaled to its own range; precipitation hangs from the top as hourly bars, as in a hydrograph. All measurements are shown at first; each one can be switched off and on with its button, which also shows the latest value. Hovering shows every value at that moment. Visitors can search for a station by river, lake, town or station number. The data refresh every ten minutes.
+The graph runs along the bottom of the start page, behind the text. At first it shows two neighbouring stations: a river or lake station of the Federal Office for the Environment (FOEN) in one of the case study areas or on a glacier-fed river, and the closest other station within 30 km, either a MeteoSwiss weather station or another river or lake (for example the Linth at Weesen with the Walensee). Another pair picks a new combination.
 
-Random picks favour the stations in `focus`: the rivers of the case study areas (Linth, Kander, Albula, Lonza, upper Aare) and glacier-fed rivers. Each focus entry matches stations by water body and, optionally, place name, and its label appears next to the station name.
+The panel on the right lists the shown stations, each in its own colour. Visitors can add up to four stations with the search (rivers, lakes and weather stations; nearby ones come first) and remove them again. Every measurement has a button that switches it off and on and shows its latest value; all start switched on. The line style tells the measurements apart: water level thick, discharge thin, water temperature dotted, air temperature dashed, and precipitation as hourly bars hanging from the top, as in a hydrograph. Each line is scaled to its own range. Hovering shows every value at that moment. The data refresh every ten minutes.
 
 The data come from [api.existenz.ch](https://api.existenz.ch), a free service that republishes the official FOEN and MeteoSwiss readings. Station lists are kept in the visitor's browser for a day. If the service cannot be reached, the line falls back to a simulated water level and says so.
 
@@ -33,10 +33,11 @@ Settings at the top of `landing.js`:
 | Setting | Meaning |
 | --- | --- |
 | `days` | How many days of readings are drawn (up to 31) |
-| `weatherWithinKm` | Farthest weather station that is still paired with a river or lake station |
-| `focusShare` | Share of random picks taken from the focus stations |
-| `focus` | The focus stations and their labels |
-| `refreshMinutes` | How often the shown station is updated |
+| `pairWithinKm` | Farthest neighbour that is paired with the first station |
+| `maxStations` | Most stations shown at once |
+| `focus` | The stations the first one is picked from, matched by water body and place, with their labels |
+| `colors` | The station colours, in the order stations are added |
+| `refreshMinutes` | How often the readings are updated |
 
 ## Adding a writing
 

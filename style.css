@@ -216,10 +216,13 @@ button, input, select { font: inherit; color: inherit; }
 .layout[data-view="panels"] .mapwrap { display: none; }
 .layout[data-view="map"] .panels     { display: none; }
 
-/* writings have no map: panels take the full width */
-.layout[data-kind="writing"] { grid-template-columns: minmax(0, 1fr); }
-.layout[data-kind="writing"] .mapwrap { display: none; }
-.layout[data-kind="writing"] .panels { display: block; }
+/* tools and writings have no map: panels take the full width */
+.layout[data-kind="writing"],
+.layout[data-kind="tool"] { grid-template-columns: minmax(0, 1fr); }
+.layout[data-kind="writing"] .mapwrap,
+.layout[data-kind="tool"] .mapwrap { display: none; }
+.layout[data-kind="writing"] .panels,
+.layout[data-kind="tool"] .panels { display: block; }
 .views[hidden] { display: none; }
 
 .panels {
@@ -500,174 +503,118 @@ button, input, select { font: inherit; color: inherit; }
 }
 
 /* ---------- Landing ---------- */
-/* One screen: text on top, the live graph takes whatever height is left,
-   the footer below it reads as the water body. */
+/* One screen: the text on the left, the live stations on the right,
+   the graph behind both along the bottom, the footer as the water body. */
 body.landing {
   display: grid;
-  grid-template-rows: auto minmax(230px, 1fr) auto;
+  grid-template-rows: 1fr auto;
   height: auto;
   min-height: 100%;
   min-height: 100dvh;
+}
 
-  /* one colour per measurement */
-  --c-level: var(--ink);
-  --c-flow: #8fc1ea;
-  --c-wtemp: #e3b36f;
-  --c-air: #e0928f;
-  --c-rain: #7fa7cf;
+.stage {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+  gap: 24px clamp(24px, 4vw, 64px);
+  align-items: start;
+  padding: clamp(18px, 4.5vh, 72px) clamp(16px, 5vw, 64px) clamp(28px, 5vh, 72px);
+}
+
+.intro,
+.gauge-panel {
+  position: relative;
+  z-index: 1;
+  text-shadow: 0 0 6px var(--bg), 0 0 2px var(--bg);   /* keeps text readable over the lines */
 }
 
 .intro {
   display: grid;
   align-content: start;
-  justify-items: start;
-  gap: clamp(14px, 2.6vh, 34px);
-  padding: clamp(18px, 4.5vh, 72px) clamp(16px, 5vw, 64px) clamp(10px, 2vh, 24px);
+  gap: clamp(14px, 2.6vh, 32px);
 }
 
 .intro-head h1 {
   margin: 0;
-  font: 600 clamp(2.3rem, min(7vw, 9vh), 7rem)/0.95 var(--font);
+  font: 600 clamp(2.6rem, min(8vw, 11vh), 8rem)/0.92 var(--font);
   letter-spacing: -0.065em;
 }
 
+.intro-head h1 span { display: block; }
+
 .intro-sub {
-  margin: clamp(8px, 1.4vh, 18px) 0 0;
-  max-width: 62ch;
+  margin: clamp(8px, 1.6vh, 20px) 0 0;
+  max-width: 44ch;
   color: var(--muted);
   font-size: clamp(.95rem, min(1.5vw, 2.1vh), 1.15rem);
   line-height: 1.45;
 }
 
-.intro-text { max-width: 84ch; }
+.intro-text { max-width: 64ch; }
 .intro-text p { margin: 0 0 8px; }
 .intro-text p:last-child { margin-bottom: 0; color: var(--muted); }
+.intro-text a,
+.intro-foot a { color: inherit; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
+.intro-text a:hover,
+.intro-foot a:hover { text-decoration-color: currentColor; }
 
-/* the menu: three entries in a row under the text */
+/* the menu: three lines under the text */
 .entries {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 24ch));
-  gap: 0 clamp(16px, 3vw, 40px);
-  width: 100%;
-  max-width: 88ch;
+  max-width: 64ch;
+  border-top: 1px solid var(--line-strong);
 }
 
 .entry {
   display: grid;
-  gap: 2px;
-  align-content: start;
-  padding: 10px 0 2px;
-  border-top: 1px solid var(--line-strong);
+  grid-template-columns: 11ch minmax(0, 1fr);
+  gap: 2px 16px;
+  align-items: baseline;
+  padding: clamp(7px, 1.3vh, 12px) 0;
+  border-bottom: 1px solid var(--line-strong);
   color: inherit;
   text-decoration: none;
 }
 
 .entry-name { font-size: 1.05rem; font-weight: 500; letter-spacing: -0.02em; }
-.entry-desc { color: var(--muted); font-size: .8rem; line-height: 1.4; }
-.entry:hover { border-top-color: var(--ink); }
+.entry-desc { color: var(--muted); font-size: .82rem; }
 .entry:hover .entry-name { text-decoration: underline; text-underline-offset: 5px; text-decoration-thickness: 1px; }
 .entry:hover .entry-desc { color: var(--ink); }
 
 /* short screens: slightly smaller text keeps everything on one screen */
-@media (max-height: 820px) and (min-width: 700px) {
-  .intro { gap: 12px; padding-top: clamp(14px, 3vh, 32px); }
-  .intro-head h1 { font-size: clamp(2.3rem, min(7vw, 7.5vh), 7rem); }
+@media (max-height: 820px) and (min-width: 821px) {
+  .intro { gap: 12px; }
+  .intro-head h1 { font-size: clamp(2.4rem, min(8vw, 10vh), 8rem); }
   .intro-text { font-size: 13px; line-height: 1.45; }
   .intro-text p { margin-bottom: 4px; }
-  .entry { padding-top: 7px; }
-  .gauge-head { padding-top: 8px; }
 }
 
-/* ---------- Live graph ---------- */
-.gauge {
+/* ---------- Live stations (right) ---------- */
+.gauge-panel {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  min-height: 0;
+  gap: 12px;
+  justify-items: end;
+  text-align: right;
 }
-
-.gauge-head {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px 24px;
-  align-items: start;
-  padding: clamp(8px, 1.6vh, 18px) clamp(16px, 5vw, 64px) 6px;
-  border-top: 1px solid var(--line);
-}
-
-.gauge-info { min-width: 0; }
-
-.gauge-title {
-  margin: 0;
-  font: 500 1rem/1.3 var(--font);
-  letter-spacing: -0.02em;
-}
-
-.gauge-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; }
-.gauge-theme { color: var(--c-flow); font-size: .78rem; font-weight: 400; letter-spacing: 0; }
-.gauge-theme[hidden] { display: none; }
-.gauge-sub { margin: 1px 0 0; color: var(--muted); font-size: .76rem; }
-
-.gauge-series {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.gauge-series:empty { display: none; }
-
-.gauge-chip {
-  --c: var(--c-level);
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--line-strong);
-  border-radius: 14px;
-  background: transparent;
-  color: var(--ink);
-  font-size: .75rem;
-  cursor: pointer;
-}
-
-.gauge-chip .chip-value { color: var(--muted); font-variant-numeric: tabular-nums; }
-.gauge-chip:hover { border-color: var(--ink); }
-.gauge-chip[aria-pressed="false"] { border-style: dashed; color: var(--muted); }
-.gauge-chip[aria-pressed="false"] .chip-swatch { opacity: .35; }
-
-.chip-swatch {
-  flex: none;
-  width: 14px;
-  height: 0;
-  border-top: 2px solid var(--c);
-}
-
-.is-weather .chip-swatch { border-top-style: dashed; }
-.s-rain .chip-swatch { height: 8px; border: 0; background: var(--c); opacity: .8; }
-
-.s-level { --c: var(--c-level); }
-.s-flow { --c: var(--c-flow); }
-.s-wtemp { --c: var(--c-wtemp); }
-.s-air { --c: var(--c-air); }
-.s-rain { --c: var(--c-rain); }
 
 .gauge-tools {
   display: flex;
-  align-items: flex-start;
+  justify-content: flex-end;
   gap: 8px;
+  width: 100%;
 }
 
-.gauge-search { position: relative; }
+.gauge-search { position: relative; flex: 1; max-width: 300px; }
 
 .gauge-search input {
-  width: min(230px, 46vw);
+  width: 100%;
   height: 32px;
   padding: 0 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--card);
-  font-size: .8rem;
+  font-size: .78rem;
 }
 
 .gauge-search input::placeholder { color: var(--muted); }
@@ -680,7 +627,7 @@ body.landing {
   right: 0;
   top: calc(100% + 4px);
   width: max(100%, 320px);
-  max-height: min(320px, 50vh);
+  max-height: min(340px, 50vh);
   margin: 0;
   padding: 4px;
   overflow: auto;
@@ -688,6 +635,8 @@ body.landing {
   border-radius: 8px;
   background: var(--raise);
   list-style: none;
+  text-align: left;
+  text-shadow: none;
 }
 
 .gauge-results li {
@@ -712,7 +661,7 @@ body.landing {
   border-radius: 8px;
   background: var(--card);
   color: var(--muted);
-  font-size: .8rem;
+  font-size: .78rem;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -720,11 +669,106 @@ body.landing {
 .gauge-next:hover:not(:disabled) { color: var(--ink); border-color: var(--line-strong); }
 .gauge-next:disabled { opacity: .5; cursor: default; }
 
-/* the plot fills the rest of the screen */
+.gauge-note { margin: 0; max-width: 40ch; color: var(--muted); font-size: .76rem; }
+.gauge-note[hidden] { display: none; }
+
+.gauge-stations {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.station { display: grid; gap: 7px; justify-items: end; }
+
+.station-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.station-swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--c);
+}
+
+.station-name { margin: 0; font: 500 .95rem/1.3 var(--font); letter-spacing: -0.02em; }
+.station-meta,
+.station-theme { margin: 1px 0 0; color: var(--muted); font-size: .74rem; }
+.station-theme { color: var(--c); }
+
+.station-remove {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--muted);
+  font-size: .85rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.station-remove:hover { color: var(--ink); border-color: var(--line-strong); }
+
+.station-series {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.gauge-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 13px;
+  background: rgba(0, 0, 0, .6);
+  color: var(--ink);
+  font-size: .72rem;
+  text-shadow: none;
+  cursor: pointer;
+}
+
+.gauge-chip .chip-value { color: var(--muted); font-variant-numeric: tabular-nums; }
+.gauge-chip:hover { border-color: var(--ink); }
+.gauge-chip[aria-pressed="false"] { border-style: dashed; color: var(--muted); }
+.gauge-chip[aria-pressed="false"] .chip-swatch { opacity: .3; }
+
+/* the swatch repeats the line style of each measurement, in the station's colour */
+.chip-swatch {
+  flex: none;
+  width: 16px;
+  height: 0;
+  border-top: 2px solid var(--c);
+}
+
+.m-flow .chip-swatch { border-top-width: 1px; }
+.m-wtemp .chip-swatch { border-top-style: dotted; }
+.m-air .chip-swatch { border-top-width: 1px; border-top-style: dashed; }
+.m-rain .chip-swatch { height: 8px; border: 0; background: var(--c); opacity: .55; }
+
+/* ---------- Live graph (behind) ---------- */
 .gauge-plot {
-  position: relative;
-  min-height: 0;
-  touch-action: pan-y;
+  position: absolute;
+  z-index: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: clamp(200px, 56%, 680px);
 }
 
 .gauge-svg {
@@ -736,28 +780,36 @@ body.landing {
 }
 
 .water-fill { fill: var(--water); opacity: .45; transition: opacity 1.2s ease .4s; }
-.gauge.is-revealing .water-fill,
-.gauge.is-revealing .g-bar { opacity: 0; transition: none; }
 .water-mean { stroke: var(--line-strong); stroke-width: 1; stroke-dasharray: 2 6; vector-effect: non-scaling-stroke; }
 
 .g-line {
   fill: none;
   stroke: var(--c);
   stroke-width: 1.25;
+  stroke-linecap: round;
   vector-effect: non-scaling-stroke;
+  transition: opacity 1.2s ease .3s;
 }
 
-.g-line.is-weather { stroke-dasharray: 5 4; stroke-width: 1; }
-.g-line.s-level { stroke-width: 1.5; }
-.g-bar { fill: var(--c); opacity: .55; transition: opacity 1.2s ease .2s; }
+.g-line.m-level { stroke-width: 2; }
+.g-line.m-flow { stroke-width: 1.1; }
+.g-line.m-wtemp { stroke-width: 1.6; stroke-dasharray: 0.5 4; }
+.g-line.m-air { stroke-width: 1.1; stroke-dasharray: 6 4; }
+.g-bar { fill: var(--c); opacity: .4; transition: opacity 1.2s ease .2s; }
+
+.gauge-plot.is-revealing .water-fill,
+.gauge-plot.is-revealing .g-bar,
+.gauge-plot.is-revealing .g-line.m-wtemp,
+.gauge-plot.is-revealing .g-line.m-air { opacity: 0; transition: none; }
 
 .gauge-dot {
+  --c: var(--ink);
   position: absolute;
   width: 9px;
   height: 9px;
   margin: -4.5px 0 0 -4.5px;
   border-radius: 50%;
-  background: var(--ink);
+  background: var(--c);
   pointer-events: none;
 }
 
@@ -765,7 +817,7 @@ body.landing {
   content: "";
   position: absolute;
   inset: -6px;
-  border: 1px solid var(--ink);
+  border: 1px solid var(--c);
   border-radius: 50%;
   opacity: 0;
   animation: gauge-pulse 2.4s ease-out infinite;
@@ -790,8 +842,8 @@ body.landing {
   z-index: 3;
   top: 8px;
   display: grid;
-  gap: 3px;
-  padding: 7px 10px;
+  gap: 6px;
+  padding: 8px 10px;
   border: 1px solid var(--line-strong);
   border-radius: 6px;
   background: var(--raise);
@@ -803,6 +855,8 @@ body.landing {
 
 .gauge-readout[hidden] { display: none; }
 .readout-time { color: var(--muted); }
+.readout-station { display: grid; gap: 2px; }
+.readout-name { color: var(--c); font-weight: 500; }
 .readout-row { display: flex; align-items: center; gap: 7px; }
 
 .gauge-scale {
@@ -830,16 +884,18 @@ body.landing {
 
 .intro-foot p { margin: 0; }
 .intro-foot p:nth-child(2) { opacity: .7; }
-.intro-foot a { color: inherit; text-underline-offset: 3px; }
 
-@media (max-width: 700px) {
-  body.landing { grid-template-rows: auto 520px auto; }
-  .entries { grid-template-columns: 1fr; gap: 0; }
-  .entry { padding-bottom: 8px; }
-  .gauge-head { grid-template-columns: 1fr; }
-  .gauge-tools { width: 100%; }
-  .gauge-search { flex: 1; }
-  .gauge-search input { width: 100%; }
+/* narrow screens: text, stations and graph one below the other */
+@media (max-width: 820px) {
+  .stage { grid-template-columns: minmax(0, 1fr); padding-bottom: 0; }
+  .gauge-panel { justify-items: stretch; text-align: left; }
+  .gauge-tools { justify-content: stretch; }
+  .gauge-search { max-width: none; }
+  .station { justify-items: start; }
+  .station-head { flex-direction: row-reverse; justify-content: flex-end; }
+  .station-series { justify-content: flex-start; }
+  .gauge-plot { position: relative; height: 320px; margin: 0 calc(-1 * clamp(16px, 5vw, 64px)); }
+  .entry { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -907,7 +963,8 @@ body.landing {
   .layout[data-view="map"] { grid-template-rows: minmax(0, 1fr); }
 
   .mapwrap { order: -1; border-left: 0; border-bottom: 1px solid var(--line); }
-  .layout[data-kind="writing"] { grid-template-rows: minmax(0, 1fr); }
+  .layout[data-kind="writing"],
+  .layout[data-kind="tool"] { grid-template-rows: minmax(0, 1fr); }
 
   .reader-bar { padding-block: 10px; }
   .reader-page { min-width: 0; }

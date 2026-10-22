@@ -1189,12 +1189,12 @@ function initControls() {
 
   el.viewButtons.forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
 
-  // Writings have no map, so the map and the view switch step aside while they are shown
+  // Tools and writings have no place on the map, so the map and the view switch step aside while they are shown
   const setKind = kind => {
     state.kind = ['all', 'place', 'tool', 'writing'].includes(kind) ? kind : 'all';
     el.kindButtons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.kind === state.kind)));
     el.layout.dataset.kind = state.kind;
-    el.viewGroup.hidden = state.kind === 'writing';
+    el.viewGroup.hidden = state.kind === 'writing' || state.kind === 'tool';
     store.set('hub:kind', state.kind);
     requestAnimationFrame(() => map?.resize());
   };
