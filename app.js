@@ -32,7 +32,12 @@ const CONFIG = {
     manifest: 'writings.json',   // titles, authors, year … for each PDF (see README.md)
     repo: 'overview',            // repository that holds the PDFs
     folder: 'writings',          // folder inside that repository
-    autoDiscover: true,          // PDFs in the folder appear even before they are listed in writings.json
+    autoDiscover: false,         // true: PDFs in the folder appear even when writings.json does not list them
+                                 // (off, because the Zotero sync writes the complete list)
+
+    // Writings from before this year are gathered in a folder of their own
+    splitYear: 2024,
+    earlierLabel: 'Before the doctorate',
   },
 
   // PDF.js draws the pages in the reader and the covers on the panels
@@ -582,6 +587,7 @@ function buildWriting(entry, used) {
     year,
     description,
     pages: 0,
+    earlier: Boolean(year) && Number(year) < CONFIG.writings.splitYear,
     place: null,
     url: file ? `?read=${encodeURIComponent(slug)}` : link,   // no PDF yet: the panel opens the DOI
     file: file ? new URL(file, location.href).href : '',
@@ -679,6 +685,7 @@ const state = {
   cards: new Map(),
   markers: new Map(),
   visible: new Set(),       // cards currently near the viewport
+  showEarlier: false,       // the folder of earlier writings is open
   live: true,               // live previews are always on
   view: store.get('hub:view', 'both'),
   kind: store.get('hub:kind', 'all'),
@@ -1091,6 +1098,44 @@ function render() {
   applyFilter(true);
 }
 
+// The folder of earlier writings: a full-width row that opens and closes
+let earlierHead = null;
+
+function makeEarlierHead() {
+  const head = document.createElement('div');
+  head.className = 'group-head';
+  const text = document.createElement('div');
+  const title = document.createElement('h2');
+  title.className = 'group-title';
+  title.textContent = CONFIG.writings.earlierLabel;
+  const sub = document.createElement('p');
+  sub.className = 'group-sub';
+  text.append(title, sub);
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'about-btn group-toggle';
+  toggle.addEventListener('click', () => {
+    state.showEarlier = !state.showEarlier;
+    applyFilter(false);
+  });
+  head.append(text, toggle);
+  return head;
+}
+
+function updateEarlierHead(shown, searching) {
+  const earlier = state.sites.filter(s => s.earlier);
+  earlierHead.hidden = shown === 0;
+  if (earlierHead.hidden) return;
+  const years = earlier.map(s => Number(s.year)).filter(Boolean);
+  const span = years.length ? (Math.min(...years) === Math.max(...years) ? `from ${Math.min(...years)}` : `from ${Math.min(...years)} to ${Math.max(...years)}`) : '';
+  earlierHead.querySelector('.group-sub').textContent =
+    `${earlier.length} ${earlier.length === 1 ? 'writing' : 'writings'} ${span}`.trim() + (searching ? ', shown because they match the search' : '');
+  const toggle = earlierHead.querySelector('.group-toggle');
+  toggle.hidden = searching;
+  toggle.textContent = state.showEarlier ? 'Close folder' : 'Open folder';
+  toggle.setAttribute('aria-expanded', String(state.showEarlier));
+}
+
 function sortGrid() {
   const by = el.sort.value;
   const sorted = [...state.sites].sort((a, b) => {
@@ -1103,8 +1148,12 @@ function sortGrid() {
     }
     return (b.updated || '').localeCompare(a.updated || '');
   });
-  // Moving a card reloads its iframe, so this only runs on load and when the sort changes
-  for (const site of sorted) el.grid.append(state.cards.get(site.id));
+  // Moving a card reloads its iframe, so this only runs on load and when the sort changes.
+  // Earlier writings always come last, behind their folder row.
+  for (const site of sorted.filter(s => !s.earlier)) el.grid.append(state.cards.get(site.id));
+  earlierHead ||= makeEarlierHead();
+  el.grid.append(earlierHead);
+  for (const site of sorted.filter(s => s.earlier)) el.grid.append(state.cards.get(site.id));
 }
 
 function applyFilter(fit = false) {
@@ -1115,10 +1164,13 @@ function applyFilter(fit = false) {
   let tools = 0;
   let writings = 0;
 
+  let earlierMatches = 0;
   for (const site of state.sites) {
     const match = (state.kind === 'all' || site.kind === state.kind) &&
       tokens.every(t => site.searchText.includes(t));
-    state.cards.get(site.id).hidden = !match;
+    if (match && site.earlier) earlierMatches++;
+    // earlier writings stay in their folder unless it is open or a search finds them
+    state.cards.get(site.id).hidden = !match || (site.earlier && !state.showEarlier && !tokens.length);
     const entry = state.markers.get(site.id);
     if (entry) {
       showMarker(entry, match);
@@ -1143,6 +1195,8 @@ function applyFilter(fit = false) {
   else if (!shown) setStatus(empty[state.kind] || 'No places yet.');
   else if (tokens.length) setStatus(`${summary} match “${raw}”`);
   else setStatus(summary);
+
+  if (earlierHead) updateEarlierHead(earlierMatches, tokens.length > 0);
 
   const offMap = [tools && count(tools, 'tool'), writings && count(writings, 'writing')].filter(Boolean);
   el.mapnote.hidden = offMap.length === 0;

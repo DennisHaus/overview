@@ -14,9 +14,13 @@ Settings (environment variables):
   ZOTERO_AUTHOR_GIVEN   given name to look for (default: Dennis)
   ZOTERO_API            API address (default: https://api.zotero.org)
 
-Two Zotero tags control what goes online:
-  website: hide         the item is left out completely
-  website: no pdf       the item is listed, but its PDF is not published
+Zotero tags control what goes online:
+  website: hide         on an item: the item is left out completely
+  website: no pdf       on an item: the item is listed, but no PDF is published
+  website: pdf          on a PDF attachment: this one is published when an item has several
+
+When an item has several PDFs and none is tagged, the one Zotero itself opens
+for the item (its "best attachment") is used, otherwise the oldest.
 
 A PDF that is not in Zotero can be added by hand as writings/<item key>.pdf,
 where the item key is the eight-character key of the Zotero item.
@@ -40,6 +44,7 @@ FAMILY = os.environ.get('ZOTERO_AUTHOR_FAMILY', 'Häusler')
 GIVEN = os.environ.get('ZOTERO_AUTHOR_GIVEN', 'Dennis')
 TAG_HIDE = 'website: hide'
 TAG_NO_PDF = 'website: no pdf'
+TAG_PDF = 'website: pdf'
 
 ROOT = Path(__file__).resolve().parent.parent
 MANIFEST = ROOT / 'writings.json'
@@ -104,13 +109,23 @@ def is_by_person(item):
     return False
 
 
-def pdf_attachment(item_key):
-    children, _ = request(f'/users/{USER}/items/{item_key}/children', {'format': 'json'})
+def pdf_attachment(item):
+    """The PDF to publish: tagged 'website: pdf', else Zotero's best attachment, else the oldest."""
+    children, _ = request(f'/users/{USER}/items/{item["key"]}/children', {'format': 'json'})
     pdfs = [c['data'] for c in children
             if c.get('data', {}).get('itemType') == 'attachment'
             and c['data'].get('contentType') == 'application/pdf'
-            and c['data'].get('linkMode') in ('imported_file', 'imported_url')]
-    return pdfs[0] if pdfs else None
+            and c['data'].get('linkMode') in ('imported_file', 'imported_url')]  # linked files never reach the server
+    if not pdfs:
+        return None
+    tagged = [p for p in pdfs if canon(TAG_PDF) in {canon(t.get('tag')) for t in p.get('tags', [])}]
+    if tagged:
+        return tagged[0]
+    best = (item.get('links', {}).get('attachment', {}).get('href') or '').rstrip('/').split('/')[-1]
+    for p in pdfs:
+        if p.get('key') == best:
+            return p
+    return sorted(pdfs, key=lambda p: p.get('dateAdded', ''))[0]
 
 
 def slug(text):
@@ -152,7 +167,10 @@ def main():
 
         manual = MANUAL_DIR / f'{key}.pdf'
         target = PDF_DIR / f'{key}.pdf'
-        attachment = pdf_attachment(key) if KEY and not no_pdf else None
+        attachment = pdf_attachment(item) if KEY and not no_pdf else None
+        if attachment:
+            chosen = attachment.get('title') or attachment.get('filename') or attachment['key']
+            print(f'  {entry["title"][:60]}: PDF "{chosen}"')
         if attachment:
             md5 = attachment.get('md5') or ''
             if state.get(key) == md5 and md5 and target.exists():
