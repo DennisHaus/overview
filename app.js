@@ -554,7 +554,7 @@ function buildWriting(entry, used) {
     (stem && titleFromSlug(stem.replace(/(?:^|[-_\s])(?:19|20)\d{2}(?=[-_\s]|$)/, ' ').trim())) || stem || 'Untitled';
 
   // Zotero ids are long URLs, so the short title makes the reader link instead
-  const slugSource = (entry.id && !isUrl(entry.id) ? entry.id : '') ||
+  const slugSource = (entry.id && !isUrl(entry.id) && !String(entry.id).includes('/') ? entry.id : '') ||
     entry['citation-key'] || entry['title-short'] || entry.title || stem;
   let slug = slugify(slugSource);
   while (used.has(slug)) slug += '-2';
@@ -624,15 +624,13 @@ async function loadWritings() {
   return { writings: entries.map(e => buildWriting(e, used)), note };
 }
 
-const pageCount = n => n ? `${n} ${n === 1 ? 'page' : 'pages'}` : '';
-
 function writingDetails(site) {
-  return [site.venue || site.publisher, site.year, pageCount(site.pages)].filter(Boolean).join(', ');
+  return [site.venue || site.publisher, site.year].filter(Boolean).join(', ');
 }
 
-// Reader header: journal or book, publisher, year and length
+// Reader header: journal or book, publisher and year
 function publicationLine(site) {
-  return [site.venue, site.publisher, site.year, pageCount(site.pages)].filter(Boolean).join(', ');
+  return [site.venue, site.publisher, site.year].filter(Boolean).join(', ');
 }
 
 /* ---------- PDF.js, loaded only when a writing is shown ---------- */
@@ -1226,6 +1224,8 @@ const reader = {
   download: $('#reader-download'),
   source: $('#reader-source'),
   zoomButtons: [...document.querySelectorAll('#reader button[data-zoom]')],
+  layoutButtons: [...document.querySelectorAll('#reader button[data-layout]')],
+  spread: store.get('hub:spread', false),   // two pages side by side, like an open book
   site: null,
   pdf: null,
   slots: [],
@@ -1239,6 +1239,8 @@ const reader = {
 const MIN_WIDTH = 240;
 const MAX_WIDTH = 2400;
 const MAX_FIT_WIDTH = 980;
+const MAX_SPREAD_WIDTH = 760;   // per page, when two pages sit side by side
+const SPREAD_GAP = 6;
 
 function setReadParam(slug) {
   const url = new URL(location.href);
@@ -1250,7 +1252,17 @@ function setReadParam(slug) {
 function fitWidth() {
   const cs = getComputedStyle(reader.pages);
   const inner = reader.pages.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  if (reader.spread) {
+    // the whole spread fits the screen, so both pages can be read side by side
+    const byHeight = (reader.pages.clientHeight - parseFloat(cs.paddingTop) - 24) / reader.ratio;
+    return Math.max(MIN_WIDTH / 2, Math.min((inner - SPREAD_GAP) / 2, byHeight, MAX_SPREAD_WIDTH));
+  }
   return Math.max(MIN_WIDTH, Math.min(inner, MAX_FIT_WIDTH));
+}
+
+function setLayoutPressed() {
+  reader.layoutButtons.forEach(b => b.setAttribute('aria-pressed', String((b.dataset.layout === 'spread') === reader.spread)));
+  reader.pages.classList.toggle('is-spread', reader.spread);
 }
 
 function setZoomPressed() {
@@ -1362,7 +1374,30 @@ function currentSlotIndex() {
 
 function updatePageLabel() {
   if (!reader.slots.length) return;
-  reader.page.textContent = `Page ${currentSlotIndex() + 1} of ${reader.slots.length}`;
+  const n = reader.slots.length;
+  const i = currentSlotIndex();
+  if (!reader.spread || i === 0) {
+    reader.page.textContent = `Page ${i + 1} of ${n}`;
+    return;
+  }
+  // the cover stands alone, then pages 2–3, 4–5 …
+  const left = i % 2 === 1 ? i : i - 1;
+  reader.page.textContent = left + 1 < n ? `Pages ${left + 1}–${left + 2} of ${n}` : `Page ${left + 1} of ${n}`;
+}
+
+function setLayout(mode) {
+  const spread = mode === 'spread';
+  if (spread === reader.spread) return;
+  const i = reader.slots.length ? currentSlotIndex() : 0;
+  reader.spread = spread;
+  store.set('hub:spread', spread);
+  setLayoutPressed();
+  if (!reader.pdf || !reader.slots.length) return;
+  reader.width = reader.fit ? fitWidth() : (spread ? reader.width / 2 : reader.width * 2);
+  reader.width = Math.max(MIN_WIDTH / 2, Math.min(MAX_WIDTH, reader.width));
+  layoutSlots();
+  reader.pages.scrollTop = reader.slots[i].el.offsetTop - 24;
+  updatePageLabel();
 }
 
 function setZoom(mode) {
@@ -1395,6 +1430,7 @@ async function openReader(site) {
   reader.pdf = null;
   reader.fit = true;
   setZoomPressed();
+  setLayoutPressed();
 
   reader.title.textContent = site.title;
   reader.authors.textContent = site.authors;
@@ -1451,6 +1487,7 @@ function initReaderControls() {
   });
 
   reader.zoomButtons.forEach(b => b.addEventListener('click', () => setZoom(b.dataset.zoom)));
+  reader.layoutButtons.forEach(b => b.addEventListener('click', () => setLayout(b.dataset.layout)));
 
   reader.dialog.addEventListener('keydown', e => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;

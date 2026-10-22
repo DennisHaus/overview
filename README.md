@@ -12,8 +12,9 @@ Doctoral research by Dennis Häusler, [Professur Voser](https://voser.arch.ethz.
 | `app.js` | Everything the hub does. Settings are at the top in `CONFIG` |
 | `style.css` | Styles for both pages |
 | `landing.js` | The live station graph on the start page. Settings are at the top in `GAUGE` |
-| `writings.json` | Titles, authors and years of the PDFs |
-| `writings/` | The PDF files |
+| `writings.json` | Titles, authors and years of the writings, written by the Zotero sync |
+| `writings/zotero/` | The PDFs, copied from Zotero by the sync |
+| `scripts/zotero_sync.py`, `.github/workflows/zotero-sync.yml` | The nightly Zotero sync |
 
 Links into the hub:
 
@@ -48,58 +49,39 @@ Settings at the top of `landing.js`:
 | `colors` | The station colours, in the order stations are added |
 | `refreshMinutes` | How often the readings are updated |
 
-## Adding a writing
+## Writings from Zotero
 
-1. Upload the PDF to the `writings/` folder. Lowercase names without spaces work best, for example `haeusler-2026-hybrid-terrain-modeling.pdf`.
-2. In Zotero, select the publication, choose *Export Item…* and pick the format **CSL JSON**.
-3. Paste the entry into `writings.json` and add one line, `"file"`, with the path to the PDF:
+The writings come from the Zotero library (user 18632873). Every night a GitHub Action (`.github/workflows/zotero-sync.yml`, running `scripts/zotero_sync.py`) reads all items with Dennis Häusler as author or editor, writes their data to `writings.json` and copies their PDF attachments to `writings/zotero/`. GitHub Pages then publishes the update. The Zotero API key stays a hidden repository secret; the website itself never contacts Zotero.
 
-```json
-[
-  {
-    "file": "writings/haeusler-2026-hybrid-terrain-modeling.pdf",
-    "id": "http://zotero.org/users/18632873/items/TA7YG9TJ",
-    "type": "chapter",
-    "title": "Hybrid Terrain Modeling: A Multidimensional Landscape Design Method",
-    "title-short": "Hybrid Terrain Modeling",
-    "container-title": "Journal of Digital Landscape Architecture 11-2026",
-    "DOI": "10.14627/537770039",
-    "author": [{ "family": "Häusler", "given": "Dennis" }],
-    "issued": { "date-parts": [["2026", 5, 28]] }
-  }
-]
-```
+### Setting it up (once)
 
-Zotero exports each file as a list in square brackets. When you add a second publication, copy only the part between `{` and `}` into the existing list and put a comma between the entries.
+1. In Zotero, create a private API key at [zotero.org/settings/keys/new](https://www.zotero.org/settings/keys/new). Name it "website sync", tick only "Allow library access" under Personal Library, and save. Copy the key.
+2. In this repository on GitHub, open Settings, then Secrets and variables, then Actions, and choose New repository secret. Name: `ZOTERO_API_KEY`. Value: the key.
+3. Open the Actions tab, choose "Sync writings from Zotero" and Run workflow. After a minute the writings appear on the site. From then on the sync runs every night; Run workflow updates the site at once.
 
-What the hub takes from each entry:
+### In Zotero
 
-| From | Shown as |
+- PDFs must be stored in Zotero (attached files, not linked files) and synced to zotero.org.
+- The sync publishes every PDF it finds. Check that you may share a PDF publicly (open access, or an author version) before attaching it.
+- Tag an item `website: no pdf` to list it without its PDF, or `website: hide` to leave it out completely.
+- A PDF that is not in Zotero can be added by hand as `writings/<item key>.pdf`, using the eight-character key of the Zotero item.
+
+`writings.json` is rewritten on every sync, so changes belong in Zotero rather than in the file. The reader link of a writing is made from its short title, for example `hub.html?read=hybrid-terrain-modeling`.
+
+### What the hub shows
+
+| Zotero field | Shown as |
 | --- | --- |
-| `title` | Panel and reader title |
-| `author` | Author line, e.g. "Dennis Häusler, Matthias Vollmer" |
-| `editor` | Used when there are no authors, marked "(eds.)" |
-| `publisher` | Shown in the reader header after the journal or book |
-| `container-title` | Journal, proceedings or book |
-| `issued` | Year on the panel, and the date for sorting |
-| `DOI` (or `URL`) | DOI button in the reader |
-| `title-short` | The short name in the reader link, e.g. `hub.html?read=hybrid-terrain-modeling` |
-| `file` | The PDF (the one line you add yourself) |
+| Title | Panel and reader title |
+| Authors | Author line; editors marked "(eds.)" when a book has no authors |
+| Publication or book title | Journal, proceedings or book |
+| Publisher | In the reader header after the journal or book |
+| Date | Year on the panel, and the order |
+| DOI or URL | DOI button in the reader; the panel opens it when there is no PDF |
 
-Other Zotero fields such as `ISBN` or `accessed` can stay; they are ignored.
+Writings without a PDF still appear: with a DOI or URL their panel opens the publisher page, otherwise they are listed as "no PDF yet".
 
-An entry without a PDF still appears. With a DOI or URL, its panel opens the publisher page; without one, it is listed as "no PDF yet". Add the file later and the panel opens the reader instead. Books that list only editors (`editor` instead of `author`) show them as "(eds.)".
-
-Optional fields you can add to any entry:
-
-| Field | Used for |
-| --- | --- |
-| `cover` | An image to show on the panel instead of the first page, e.g. `"writings/hybrid-terrain-modeling.jpg"` |
-| `description` | Short text on the panel when there are no authors |
-
-If `writings.json` has a typing error, the hub says so at the top. The simple format from before (`title`, `authors`, `year`, `venue`) still works too.
-
-PDFs that are in the folder but not yet in `writings.json` still appear, with a title made from the file name. This uses one GitHub request; turn it off with `autoDiscover: false` in `CONFIG.writings`.
+The reader shows one page at a time or two side by side, like an open book. In two-page view, Fit shows the whole spread on screen.
 
 ## Notes on large scans
 

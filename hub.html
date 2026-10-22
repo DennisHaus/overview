@@ -85,9 +85,13 @@
       </div>
       <div class="reader-tools">
         <span id="reader-page" class="reader-page" aria-live="polite"></span>
+        <div class="views" role="group" aria-label="Page layout">
+          <button type="button" data-layout="single" aria-pressed="true">Single</button>
+          <button type="button" data-layout="spread" aria-pressed="false">Two pages</button>
+        </div>
         <div class="views" role="group" aria-label="Zoom">
           <button type="button" data-zoom="out" aria-label="Zoom out">−</button>
-          <button type="button" data-zoom="fit" aria-pressed="true">Fit width</button>
+          <button type="button" data-zoom="fit" aria-pressed="true">Fit</button>
           <button type="button" data-zoom="in" aria-label="Zoom in">+</button>
         </div>
         <a id="reader-source" class="about-btn reader-btn" href="#" target="_blank" rel="noopener" hidden>DOI</a>

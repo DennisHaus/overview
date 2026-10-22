@@ -492,6 +492,20 @@ button, input, select { font: inherit; color: inherit; }
 
 .sheet-slot canvas { display: block; width: 100%; height: auto; }
 
+/* two pages side by side; the cover stands alone on the right, like a book */
+.reader-pages.is-spread {
+  display: grid;
+  grid-template-columns: repeat(2, var(--sheet-width));
+  justify-content: safe center;
+  align-content: start;
+  align-items: start;
+  column-gap: 6px;
+}
+
+.reader-pages.is-spread .sheet-slot { margin: 0 0 18px; }
+.reader-pages.is-spread .sheet-slot:first-child { grid-column: 2; }
+.reader-pages.is-spread .reader-error { grid-column: 1 / -1; }
+
 .reader-error {
   max-width: 52ch;
   margin: 40px auto;
