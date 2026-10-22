@@ -116,6 +116,7 @@ const DAY = 86400000;
 const $ = id => document.getElementById(id);
 const SVG = 'http://www.w3.org/2000/svg';
 const still = matchMedia('(prefers-reduced-motion: reduce)');
+const narrow = matchMedia('(max-width: 820px)');   // phones: graph only, no station panel
 
 const norm = v => String(v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -898,6 +899,7 @@ function initReadout() {
 
   // listen on the whole stage, because the graph lies behind the text
   el.stage.addEventListener('pointermove', e => {
+    if (e.pointerType === 'touch' || narrow.matches) { hide(); return; } // phones only show the graph
     const box = el.plot.getBoundingClientRect();
     const inside = e.clientY >= box.top && e.clientY <= box.bottom && e.clientX >= box.left && e.clientX <= box.right;
     if (!inside || el.plot.dataset.state !== 'live' || e.target.closest('a, button, input, .gauge-panel')) { hide(); return; }

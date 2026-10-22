@@ -1002,17 +1002,26 @@ body.landing {
 .intro-foot p { margin: 0; }
 .intro-foot p:nth-child(2) { opacity: .7; }
 
-/* narrow screens: text, stations and graph one below the other */
+/* phones and narrow windows: only the title, text and menu, with the live graph behind them.
+   The station panel and the reading on touch are left out. */
 @media (max-width: 820px) {
-  .stage { grid-template-columns: minmax(0, 1fr); padding-bottom: 0; }
-  .gauge-panel { justify-items: stretch; text-align: left; }
-  .gauge-tools { justify-content: stretch; }
-  .gauge-search { max-width: none; }
-  .station { justify-items: start; }
-  .station-head { flex-direction: row-reverse; justify-content: flex-end; }
-  .station-series { justify-content: flex-start; }
-  .gauge-plot { position: relative; height: 320px; margin: 0 calc(-1 * clamp(16px, 5vw, 64px)); }
-  .entry { grid-template-columns: 1fr; }
+  .stage {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 22px 18px 14px;
+  }
+  .gauge-panel,
+  .gauge-readout,
+  .gauge-cursor { display: none !important; }
+  .gauge-plot { height: 58%; }
+  .gauge-scale { inset: auto 16px 6px; }
+  .intro { gap: 14px; }
+  .intro-head h1 { font-size: clamp(2.5rem, 12.5vw, 4.5rem); }
+  .intro-sub { margin-top: 8px; font-size: .9rem; }
+  .intro-text { font-size: 12.5px; line-height: 1.45; }
+  .intro-text p { margin-bottom: 6px; }
+  .entry { grid-template-columns: 1fr; gap: 0; padding: 7px 0; }
+  .entry-desc { font-size: .74rem; }
+  .intro-foot { gap: 2px 16px; padding: 9px 18px 12px; font-size: .72rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
