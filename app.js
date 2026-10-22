@@ -523,19 +523,49 @@ async function fetchWritingFiles() {
   return data;
 }
 
-function buildWriting(entry, used) {
-  const fileName = decodeURIComponent(String(entry.file).split('/').pop());
-  const stem = fileName.replace(/\.pdf$/i, '');
-  const year = String(entry.year || (stem.match(/(?:^|\D)((?:19|20)\d{2})(?:\D|$)/) || [])[1] || '');
-  const title = entry.title || titleFromSlug(stem.replace(/(?:^|[-_\s])(?:19|20)\d{2}(?=[-_\s]|$)/, ' ').trim()) || stem;
+/* ---------- CSL JSON, as exported from Zotero ---------- */
+const isUrl = value => /^[a-z][a-z0-9+.-]*:\/\//i.test(String(value || ''));
 
-  let slug = slugify(entry.id || stem);
+function cslNames(list) {
+  return (Array.isArray(list) ? list : [])
+    .map(a => a.literal || [a.given, a['non-dropping-particle'], a.family].filter(Boolean).join(' '))
+    .filter(Boolean);
+}
+
+// "issued": { "date-parts": [[2026, 5, 28]] }  ->  { year: "2026", date: "2026-05-28" }
+function cslDate(value) {
+  const parts = value?.['date-parts']?.[0];
+  if (parts?.length && parts[0]) {
+    const [y, m, d] = parts.map(Number);
+    const pad = n => String(n).padStart(2, '0');
+    return { year: String(y), date: [y, m && pad(m), m && d && pad(d)].filter(Boolean).join('-') };
+  }
+  const year = String(value?.raw || value?.literal || '').match(/(?:19|20)\d{2}/)?.[0];
+  return year ? { year, date: '' } : null;
+}
+
+function buildWriting(entry, used) {
+  const file = typeof entry.file === 'string' ? entry.file.trim() : '';
+  const fileName = file ? decodeURIComponent(file.split('/').pop()) : '';
+  const stem = fileName.replace(/\.pdf$/i, '');
+  const issued = cslDate(entry.issued);
+  const year = String(entry.year || issued?.year || (stem.match(/(?:^|\D)((?:19|20)\d{2})(?:\D|$)/) || [])[1] || '');
+  const title = entry.title ||
+    (stem && titleFromSlug(stem.replace(/(?:^|[-_\s])(?:19|20)\d{2}(?=[-_\s]|$)/, ' ').trim())) || stem || 'Untitled';
+
+  // Zotero ids are long URLs, so the short title makes the reader link instead
+  const slugSource = (entry.id && !isUrl(entry.id) ? entry.id : '') ||
+    entry['citation-key'] || entry['title-short'] || entry.title || stem;
+  let slug = slugify(slugSource);
   while (used.has(slug)) slug += '-2';
   used.add(slug);
 
-  const authors = Array.isArray(entry.authors) ? entry.authors.join(', ') : (entry.authors || '');
-  const venue = entry.venue || '';
+  const authors = Array.isArray(entry.authors) ? entry.authors.join(', ')
+    : (entry.authors || cslNames(entry.author).join(', '));
+  const venue = entry.venue || entry['container-title'] || entry.publisher || '';
   const description = entry.description || '';
+  const doi = String(entry.DOI || '').replace(/^https?:\/\/(dx\.)?doi\.org\//i, '').trim();
+  const link = doi ? `https://doi.org/${doi}` : (isUrl(entry.URL) ? entry.URL : '');
 
   return {
     id: `writing:${slug}`,
@@ -548,13 +578,16 @@ function buildWriting(entry, used) {
     description,
     pages: 0,
     place: null,
-    url: `?read=${encodeURIComponent(slug)}`,
-    file: new URL(entry.file, location.href).href,
+    url: file ? `?read=${encodeURIComponent(slug)}` : link,   // no PDF yet: the panel opens the DOI
+    file: file ? new URL(file, location.href).href : '',
     fileName,
+    doi,
+    link,
     cover: entry.cover ? new URL(entry.cover, location.href).href : '',
     previews: [],
-    updated: entry.date || (year ? `${year}-01-01` : ''),
-    searchText: norm([title, authors, venue, year, description, stem, 'writing writings publication paper pdf'].join(' ')),
+    updated: entry.date || issued?.date || (year ? `${year}-01-01` : ''),
+    searchText: norm([title, entry['title-short'], authors, venue, year, description, stem, doi,
+      'writing writings publication paper pdf'].join(' ')),
   };
 }
 
@@ -570,11 +603,12 @@ async function loadWritings() {
     }
   } catch { /* no manifest yet */ }
   if (!Array.isArray(entries)) entries = [];
-  entries = entries.filter(e => e && typeof e.file === 'string' && e.file.trim());
+  const hasFile = e => typeof e.file === 'string' && e.file.trim();
+  entries = entries.filter(e => e && (hasFile(e) || e.DOI || isUrl(e.URL)));
 
   if (CONFIG.writings.autoDiscover) {
     try {
-      const listed = new Set(entries.map(e => fileKey(e.file)));
+      const listed = new Set(entries.filter(hasFile).map(e => fileKey(e.file)));
       for (const f of await fetchWritingFiles()) {
         if (!listed.has(fileKey(f.path))) entries.push({ file: f.path });
       }
@@ -827,15 +861,17 @@ let viewObserver;
 
 function makeCard(site) {
   const isWriting = site.kind === 'writing';
+  const readable = isWriting && Boolean(site.file);
   const card = document.createElement('a');
   card.className = 'card';
   card.href = site.url;
-  if (!isWriting) {
+  if (!readable) {
     card.target = '_blank';
     card.rel = 'noopener';
   }
   card.dataset.id = site.id;
-  card.title = isWriting ? `Read ${site.title}` : `Open ${site.title} in a new tab`;
+  card.title = readable ? `Read ${site.title}`
+    : isWriting ? `Open ${site.title} at the publisher (no PDF uploaded yet)` : `Open ${site.title} in a new tab`;
 
   const preview = document.createElement('div');
   preview.className = 'preview';
@@ -852,7 +888,7 @@ function makeCard(site) {
   const place = document.createElement('p');
   place.className = 'place';
   if (isWriting) {
-    place.textContent = 'Writing';
+    place.textContent = readable ? 'Writing' : 'Writing, publisher page only';
     const details = document.createElement('span');
     details.className = 'coords';
     details.textContent = writingDetails(site);
@@ -880,8 +916,8 @@ function makeCard(site) {
 
   card.append(preview, meta);
 
-  if (isWriting) {
-    preview.classList.add('is-doc');
+  if (isWriting) preview.classList.add('is-doc');
+  if (readable) {
     card.addEventListener('click', e => {
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return; // new tab still works
       e.preventDefault();
@@ -907,7 +943,7 @@ async function resolvePreview(site, card) {
 
   if (site.kind === 'writing') {
     site.previewKind = 'doc';
-    renderCover(site, card, box);
+    if (site.file || site.cover) renderCover(site, card, box);
     return;
   }
 
@@ -936,6 +972,7 @@ async function renderCover(site, card, box) {
     box.append(img);
     return;
   }
+  if (!site.file) return;
   try {
     const pdf = await openPdf(site.file);
     site.pages = pdf.numPages;
@@ -1172,6 +1209,7 @@ const reader = {
   meta: $('#reader-meta'),
   page: $('#reader-page'),
   download: $('#reader-download'),
+  source: $('#reader-source'),
   zoomButtons: [...document.querySelectorAll('#reader button[data-zoom]')],
   site: null,
   pdf: null,
@@ -1347,6 +1385,10 @@ async function openReader(site) {
   reader.meta.textContent = [site.authors, site.venue, site.year].filter(Boolean).join(', ');
   reader.download.href = site.file;
   reader.download.setAttribute('download', site.fileName);
+  reader.source.hidden = !site.link;
+  reader.source.href = site.link || '#';
+  reader.source.textContent = site.doi ? 'DOI' : 'Publisher page';
+  reader.source.title = site.doi ? `doi.org/${site.doi}` : '';
   reader.page.textContent = 'Loading pages…';
 
   if (!reader.dialog.open) reader.dialog.showModal();
@@ -1419,7 +1461,7 @@ function initReaderControls() {
 function openFromUrl() {
   const slug = new URLSearchParams(location.search).get('read');
   if (!slug) return;
-  const site = state.sites.find(s => s.kind === 'writing' && s.slug === slug);
+  const site = state.sites.find(s => s.kind === 'writing' && s.slug === slug && s.file);
   if (site) openReader(site);
   else {
     setStatus(`No writing called “${slug}” is listed. It may have been renamed or removed.`, true);

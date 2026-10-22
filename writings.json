@@ -1,10 +1,52 @@
 [
-  {
-    "id": "hybrid-modelling",
-    "file": "writings/2026_HybridModelling.pdf",
-    "title": "Hybrid Modelling",
-    "authors": ["Dennis Häusler","Matthias Vollmer","Pia Fricker", "Martina Voser"],
-    "year": 2026,
-    "venue": "Journal of Digital Landscape Architecture"
-  }
+	{
+		"file": "writings/2026_HybridModelling.pdf",
+		"id": "http://zotero.org/users/18632873/items/TA7YG9TJ",
+		"type": "chapter",
+		"container-title": "Journal of Digital Landscape Architecture 11-2026",
+		"DOI": "10.14627/537770039",
+		"ISBN": "978-3-87907-770-0",
+		"language": "eng",
+		"publisher": "Wichmann Verlag",
+		"source": "DOI.org (CSL JSON)",
+		"title": "Hybrid Terrain Modeling: A Multidimensional Landscape Design Method",
+		"title-short": "Hybrid Terrain Modeling",
+		"URL": "https://doi.org/10.14627/537770039",
+		"author": [
+			{
+				"family": "Häusler",
+				"given": "Dennis"
+			},
+			{
+				"family": "Vollmer",
+				"given": "Matthias"
+			},
+			{
+				"family": "Voser",
+				"given": "Martina"
+			},
+			{
+				"family": "Fricker",
+				"given": "Pia"
+			}
+		],
+		"accessed": {
+			"date-parts": [
+				[
+					"2026",
+					7,
+					23
+				]
+			]
+		},
+		"issued": {
+			"date-parts": [
+				[
+					"2026",
+					5,
+					28
+				]
+			]
+		}
+	}
 ]

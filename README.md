@@ -22,36 +22,52 @@ Links into the hub:
 
 ## Adding a writing
 
-1. Upload the PDF to the `writings/` folder. Lowercase names without spaces work best, for example `haeusler-2025-hybrid-modelling.pdf`.
-2. Add an entry to `writings.json`:
+1. Upload the PDF to the `writings/` folder. Lowercase names without spaces work best, for example `haeusler-2026-hybrid-terrain-modeling.pdf`.
+2. In Zotero, select the publication, choose *Export Item…* and pick the format **CSL JSON**.
+3. Paste the entry into `writings.json` and add one line, `"file"`, with the path to the PDF:
 
 ```json
 [
   {
-    "id": "hybrid-modelling",
-    "file": "writings/haeusler-2025-hybrid-modelling.pdf",
-    "title": "Hybrid Modelling",
-    "authors": ["Dennis Häusler", "Martina Voser"],
-    "year": 2025,
-    "venue": "Journal of Digital Landscape Architecture"
+    "file": "writings/haeusler-2026-hybrid-terrain-modeling.pdf",
+    "id": "http://zotero.org/users/18632873/items/TA7YG9TJ",
+    "type": "chapter",
+    "title": "Hybrid Terrain Modeling: A Multidimensional Landscape Design Method",
+    "title-short": "Hybrid Terrain Modeling",
+    "container-title": "Journal of Digital Landscape Architecture 11-2026",
+    "DOI": "10.14627/537770039",
+    "author": [{ "family": "Häusler", "given": "Dennis" }],
+    "issued": { "date-parts": [["2026", 5, 28]] }
   }
 ]
 ```
 
-Only `file` is required. Everything else is optional:
+Zotero exports each file as a list in square brackets. When you add a second publication, copy only the part between `{` and `}` into the existing list and put a comma between the entries.
+
+What the hub takes from each entry:
+
+| From | Shown as |
+| --- | --- |
+| `title` | Panel and reader title |
+| `author` | Author line, e.g. "Dennis Häusler, Matthias Vollmer" |
+| `container-title` | Journal, proceedings or book |
+| `issued` | Year on the panel, and the date for sorting |
+| `DOI` (or `URL`) | DOI button in the reader |
+| `title-short` | The short name in the reader link, e.g. `hub.html?read=hybrid-terrain-modeling` |
+| `file` | The PDF (the one line you add yourself) |
+
+Other Zotero fields such as `ISBN` or `accessed` can stay; they are ignored.
+
+An entry without `"file"` still appears, as a panel that opens the DOI at the publisher. Add the file later and the panel opens the reader instead.
+
+Optional fields you can add to any entry:
 
 | Field | Used for |
 | --- | --- |
-| `id` | The short name in the reader link (`hub.html?read=hybrid-modelling`). Taken from the file name if left out. Keep it stable once you share links |
-| `title` | Panel and reader title. Taken from the file name if left out |
-| `authors` | A list or a single text |
-| `year` | Shown on the panel and used for sorting by date. Taken from the file name if it contains a year |
-| `date` | Exact date for sorting, e.g. `"2025-06-12"` |
-| `venue` | Journal, conference or book |
+| `cover` | An image to show on the panel instead of the first page, e.g. `"writings/hybrid-terrain-modeling.jpg"` |
 | `description` | Short text on the panel when there are no authors |
-| `cover` | An image to show on the panel instead of the first page, e.g. `"writings/hybrid-modelling.jpg"` |
 
-Separate entries with commas and keep the square brackets around the whole list. If the file has a typing error, the hub says so at the top.
+If `writings.json` has a typing error, the hub says so at the top. The simple format from before (`title`, `authors`, `year`, `venue`) still works too.
 
 PDFs that are in the folder but not yet in `writings.json` still appear, with a title made from the file name. This uses one GitHub request; turn it off with `autoDiscover: false` in `CONFIG.writings`.
 

@@ -455,6 +455,8 @@ button, input, select { font: inherit; color: inherit; }
   text-decoration: none;
 }
 
+.reader-btn[hidden] { display: none; }
+
 .reader-pages {
   --sheet-width: 800px;
   position: relative;
