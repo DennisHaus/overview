@@ -28,7 +28,49 @@ const GAUGE = {
   },
   defaultRange: 'week',
 
-  pairWithinKm: 30,                 // farthest neighbour that is paired with the first station
+  downstreamWithinKm: 60,           // farthest downstream station that is paired with the first one
+  pairWithinKm: 30,                 // farthest weather station, when no downstream station is found
+
+  // Where each river or lake flows on to (names as in the FOEN station list, without accents).
+  // Together with the water levels this decides which stations are hydrologically connected:
+  // a station counts as downstream only if its water level is lower.
+  flows: {
+    linth: ['walensee', 'linthkanal', 'zurichsee', 'limmat'],
+    escherkanal: ['walensee', 'linthkanal'],
+    walensee: ['linthkanal', 'linth', 'zurichsee', 'limmat'],
+    seez: ['walensee', 'linthkanal'],
+    linthkanal: ['zurichsee', 'limmat'],
+    zurichsee: ['limmat'],
+    sihl: ['limmat'],
+    limmat: ['aare'],
+    kander: ['thunersee', 'aare'],
+    simme: ['kander', 'thunersee', 'aare'],
+    lutschine: ['brienzersee', 'aare', 'thunersee'],
+    'weisse lutschine': ['lutschine', 'brienzersee'],
+    'schwarze lutschine': ['lutschine', 'brienzersee'],
+    aare: ['brienzersee', 'thunersee', 'bielersee', 'rhein'],
+    brienzersee: ['aare', 'thunersee'],
+    thunersee: ['aare', 'bielersee'],
+    albula: ['hinterrhein', 'rhein'],
+    landwasser: ['albula', 'hinterrhein', 'rhein'],
+    hinterrhein: ['rhein'],
+    vorderrhein: ['rhein'],
+    rhein: ['bodensee'],
+    lonza: ['rhone'],
+    massa: ['rhone'],
+    vispa: ['rhone'],
+    'saaser vispa': ['vispa', 'rhone'],
+    'matter vispa': ['vispa', 'rhone'],
+    navisence: ['rhone'],
+    borgne: ['rhone'],
+    drance: ['rhone'],
+    rhone: ['lac leman', 'genfersee', 'leman'],
+    reuss: ['vierwaldstattersee', 'aare'],
+    'engelberger aa': ['vierwaldstattersee'],
+    vierwaldstattersee: ['reuss'],
+    rosegbach: ['flazbach', 'inn'],
+    flazbach: ['inn'],
+  },
   maxStations: 4,
   refreshMinutes: 10,
   cacheHours: 24,                   // station lists are kept this long in the browser
@@ -159,7 +201,7 @@ function parseStations(json, kind) {
     const theme = kind === 'hydro' ? themeOf(water, place) : '';
 
     return {
-      key: `${kind}:${id}`, kind, id, title, what, theme,
+      key: `${kind}:${id}`, kind, id, title, what, theme, water, waterKey: norm(water),
       lat: num(d.lat ?? d.latitude), lon: num(d.lon ?? d.lng ?? d.longitude),
       chx: num(d.chx ?? d.x), chy: num(d.chy ?? d.y),
       search: norm(`${title} ${place} ${water} ${canton} ${id} ${type} ${theme} ${kind === 'smn' ? 'weather meteo' : ''}`),
@@ -196,6 +238,51 @@ function distanceKm(a, b) {
     return Math.hypot(lv03(a.chx) - lv03(b.chx), lv03(a.chy) - lv03(b.chy)) / 1000;
   }
   return Infinity;
+}
+
+// The waters a river or lake flows on to, looked up by its name
+function flowsOnTo(waterKey) {
+  if (!waterKey) return [];
+  const exact = GAUGE.flows[waterKey];
+  if (exact) return exact;
+  const loose = Object.keys(GAUGE.flows).find(k => waterKey.startsWith(`${k} `) || waterKey.endsWith(` ${k}`));
+  return loose ? GAUGE.flows[loose] : [];
+}
+
+const sameWater = (a, b) => a && b && (a === b || a.startsWith(`${b} `) || b.startsWith(`${a} `));
+
+// Current water level above sea level per station, from one request
+async function levelsOf(stations) {
+  const json = await liveApi('/hydro/latest', { locations: stations.map(s => s.id).join(','), parameters: 'height' });
+  const out = new Map();
+  for (const row of Array.isArray(json?.payload) ? json.payload : []) {
+    const v = num(row.val);
+    if (row.par === 'height' && Number.isFinite(v)) out.set(String(row.loc), v);
+  }
+  return out;
+}
+
+// River and lake stations downstream of a station, nearest first: on the same water or on
+// the waters it flows into, and with a lower water level whenever both levels are known
+async function downstreamOf(first) {
+  const onward = flowsOnTo(first.waterKey);
+  const candidates = state.catalogue.hydro
+    .filter(s => s.key !== first.key && s.waterKey)
+    .map(s => ({ s, km: distanceKm(first, s), same: sameWater(s.waterKey, first.waterKey), onward: onward.some(w => sameWater(s.waterKey, w)) }))
+    .filter(c => (c.same || c.onward) && c.km <= GAUGE.downstreamWithinKm)
+    .sort((a, b) => a.km - b.km)
+    .slice(0, 12);
+  if (!candidates.length) return [];
+
+  let levels = new Map();
+  try { levels = await levelsOf([first, ...candidates.map(c => c.s)]); } catch { /* decide without levels */ }
+  const own = levels.get(first.id);
+
+  return candidates.filter(c => {
+    const level = levels.get(c.s.id);
+    if (Number.isFinite(own) && Number.isFinite(level)) return level < own - 0.05; // water flows downhill
+    return c.onward && !c.same; // without levels, only the listed onward waters count as downstream
+  });
 }
 
 function neighbours(station, withinKm) {
@@ -565,7 +652,10 @@ function renderList() {
     const meta = document.createElement('p');
     meta.className = 'station-meta';
     const parts = [station.what];
-    if (i > 0 && first) parts.push(`${Math.max(1, Math.round(distanceKm(first, station)))} km from ${first.title}`);
+    if (i > 0 && first) {
+      const km = Math.max(1, Math.round(distanceKm(first, station)));
+      parts.push(entry.relation === 'downstream' ? `${km} km downstream of ${first.title}` : `${km} km from ${first.title}`);
+    }
     meta.textContent = parts.join(', ');
     text.append(name, meta);
     if (station.theme) {
@@ -636,7 +726,8 @@ function applyShown(entries, animate = true) {
   draw(animate);
 }
 
-// A station from a case study area, with its closest neighbour that has readings
+// A station from a case study area, with the next station downstream on the same water.
+// Only when no such pair can be found does a nearby weather station take the second place.
 async function showPair() {
   const token = ++state.token;
   setNote('Loading readings…');
@@ -644,28 +735,51 @@ async function showPair() {
   const focus = hydro.filter(s => s.theme);
   const pool = (focus.length ? focus : hydro).slice().sort(() => Math.random() - 0.5);
   const current = state.shown[0]?.station.key;
+  let fallback = null;
 
-  for (const station of pool.filter(s => s.key !== current).slice(0, 6)) {
-    let series = [];
-    try { series = await loadSeries(station, state.range); } catch { /* try the next one */ }
+  const tryLoad = async station => {
+    try {
+      const series = await loadSeries(station, state.range);
+      return series.length ? series : null;
+    } catch { return null; }
+  };
+
+  for (const station of pool.filter(s => s.key !== current).slice(0, 8)) {
+    const series = await tryLoad(station);
     if (token !== state.token) return;
-    if (!series.length) continue;
+    if (!series) continue;
+    fallback ||= { station, series };
 
-    let second = null;
-    for (const n of neighbours(station, GAUGE.pairWithinKm).slice(0, 4)) {
-      try {
-        const s2 = await loadSeries(n.s, state.range);
-        if (s2.length) second = { station: n.s, series: s2 };
-      } catch { /* try the next neighbour */ }
+    let partners = [];
+    try { partners = await downstreamOf(station); } catch { /* try the next station */ }
+    if (token !== state.token) return;
+
+    for (const p of partners.slice(0, 3)) {
+      const s2 = await tryLoad(p.s);
       if (token !== state.token) return;
-      if (second) break;
+      if (!s2) continue;
+      state.hidden.clear();
+      applyShown([
+        { station, series, color: GAUGE.colors[0] },
+        { station: p.s, series: s2, color: GAUGE.colors[1], relation: 'downstream' },
+      ]);
+      setNote('');
+      return;
     }
+  }
 
+  if (fallback) {
+    let second = null;
+    for (const n of neighbours(fallback.station, GAUGE.pairWithinKm).filter(n => n.s.kind === 'smn').slice(0, 3)) {
+      const s2 = await tryLoad(n.s);
+      if (token !== state.token) return;
+      if (s2) { second = { station: n.s, series: s2, relation: 'weather' }; break; }
+    }
     state.hidden.clear();
-    const entries = [{ station, series, color: GAUGE.colors[0] }];
+    const entries = [{ ...fallback, color: GAUGE.colors[0] }];
     if (second) entries.push({ ...second, color: GAUGE.colors[1] });
     applyShown(entries);
-    setNote(second ? '' : `No other station within ${GAUGE.pairWithinKm} km. Add one with the search.`);
+    setNote('No connected station downstream was found, so a nearby station is shown. Add more with the search.');
     return;
   }
   if (isLive()) showUnavailable();
