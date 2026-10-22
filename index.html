@@ -4,78 +4,58 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
-  <title>Places · Tools</title>
-  <meta name="description" content="All websites by dennishaus as preview panels and on a map of Europe.">
-  
+  <title>Entwerfen in der Zeit</title>
+  <meta name="description" content="Methoden und Konzepte für dynamische Wasserlandschaften der Schweiz. Doctoral research by Dennis Häusler at Professur Voser, ETH Zürich.">
+  <meta property="og:title" content="Entwerfen in der Zeit">
+  <meta property="og:description" content="Methoden und Konzepte für dynamische Wasserlandschaften der Schweiz">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-
-  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
-  <header class="masthead">
-    <div class="brand">
-      <h1>Places</h1>
-      <p class="sub">Every website by dennishaus, as panels and on the map. Click a panel to open the site in a new tab.</p>
+<body class="landing">
+  <main class="intro">
+    <header class="intro-head">
+      <h1>Entwerfen in der Zeit</h1>
+      <p class="intro-sub">Methoden und Konzepte für dynamische Wasserlandschaften der Schweiz</p>
+    </header>
+
+    <div class="intro-text">
+      <p>A doctoral research project by Dennis Häusler at Professur Voser, Institute for Landscape and Urban Studies, ETH Zürich.</p>
+      <p>Swiss water landscapes change over minutes, seasons and decades. Shorelines shift with the water level, alpine slopes creep and break away, and snow and ice hold water back to release it months later. The project develops design methods that work with these changes instead of fixing a single state, through theory, experiments with models, simulations and web tools, and case studies in the plain, the valley and the high Alps.</p>
+      <p>This platform brings the research together.</p>
     </div>
 
-    <div class="controls">
-      <label class="search">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <span class="visually-hidden">Search websites</span>
-        <input id="search" type="search" placeholder="Search names, places, countries" autocomplete="off" spellcheck="false">
-        <kbd aria-hidden="true">/</kbd>
-      </label>
-
-      <label class="select">
-        <span class="visually-hidden">Sort</span>
-        <select id="sort">
-          <option value="updated">Recently updated</option>
-          <option value="name">Name A–Z</option>
-          <option value="place">By place</option>
-        </select>
-      </label>
-
-      <div class="views" role="group" aria-label="Show">
-        <button type="button" data-kind="all" aria-pressed="true">All</button>
-        <button type="button" data-kind="place" aria-pressed="false">Places</button>
-        <button type="button" data-kind="tool" aria-pressed="false">Tools</button>
-      </div>
-
-      <div class="views" role="group" aria-label="View">
-        <button type="button" data-view="both" aria-pressed="true">Panels + map</button>
-        <button type="button" data-view="panels" aria-pressed="false">Panels</button>
-        <button type="button" data-view="map" aria-pressed="false">Map</button>
-      </div>
-
-      <button id="about-open" class="about-btn" type="button" aria-haspopup="dialog">About</button>
-    </div>
-  </header>
-
-  <main id="layout" class="layout" data-view="both">
-    <section id="panels" class="panels" aria-label="Websites">
-      <p id="status" class="status" role="status"></p>
-      <div id="grid" class="grid"></div>
-    </section>
-
-    <section class="mapwrap" aria-label="Map">
-      <div id="map"></div>
-      <p id="mapnote" class="mapnote" hidden></p>
-      <p class="credit">© OpenStreetMap contributors, OpenMapTiles, OpenFreeMap</p>
-    </section>
+    <nav class="entries" aria-label="Contents">
+      <a class="entry" href="hub.html?kind=place">
+        <span class="entry-name">Places</span>
+        <span class="entry-desc">Case study and field sites, on a map.</span>
+      </a>
+      <a class="entry" href="hub.html?kind=tool">
+        <span class="entry-name">Tools</span>
+        <span class="entry-desc">Models, simulations and viewers that run in the browser.</span>
+      </a>
+      <a class="entry" href="hub.html?kind=writing">
+        <span class="entry-name">Writings</span>
+        <span class="entry-desc">Published papers to read online or download as PDF.</span>
+      </a>
+    </nav>
   </main>
 
-  <dialog id="about" class="about" aria-labelledby="about-title">
-    <h2 id="about-title">About</h2>
-    <p>This platform is part of the doctoral research project by Dennis Häusler.</p>
-    <p>Contact: <a href="mailto:haeusler@arch.ethz.ch">haeusler@arch.ethz.ch</a></p>
-    <p class="about-copy">© ETH Zürich, Institute for Landscape and Urban Studies, Professur Voser</p>
-    <button id="about-close" class="about-close" type="button">Close</button>
-  </dialog>
+  <figure class="waterline" aria-hidden="true">
+    <svg id="waterline" viewBox="0 0 1200 200" preserveAspectRatio="none">
+      <path id="water-fill" class="water-fill" d=""></path>
+      <line class="water-mean" x1="0" y1="100" x2="1200" y2="100"></line>
+      <path id="water-line" class="water-line" d=""></path>
+    </svg>
+  </figure>
 
-  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-  <script src="app.js"></script>
+  <footer class="intro-foot">
+    <p>© ETH Zürich, Institute for Landscape and Urban Studies, Professur Voser</p>
+    <p><a href="mailto:haeusler@arch.ethz.ch">haeusler@arch.ethz.ch</a></p>
+  </footer>
+
+  <script src="landing.js"></script>
 </body>
 </html>

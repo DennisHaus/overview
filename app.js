@@ -27,6 +27,18 @@ const CONFIG = {
     // some_repo: { preview: 'https://dennishaus.github.io/some_repo/cover.jpg', description: 'Text' },
   },
 
+  // Writings: PDFs kept in a folder of this repository and listed in writings.json
+  writings: {
+    manifest: 'writings.json',   // titles, authors, year … for each PDF (see README.md)
+    repo: 'overview',            // repository that holds the PDFs
+    folder: 'writings',          // folder inside that repository
+    autoDiscover: true,          // PDFs in the folder appear even before they are listed in writings.json
+  },
+
+  // PDF.js draws the pages in the reader and the covers on the panels
+  pdfjs: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
+  pdfjsWorker: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
+
   livePreviewWidth: 1280,      // the size the site is rendered at before being scaled into the panel
   livePreviewHeight: 800,
   maxLivePreviews: 8,          // browsers only allow ~16 WebGL contexts, so keep this modest
@@ -485,6 +497,136 @@ function buildSite(repo, meta) {
 }
 
 /* =====================================================================
+   Writings — PDFs listed in writings.json, plus any others in the folder
+   ===================================================================== */
+const fileKey = path => decodeURIComponent(String(path)).replace(/^\.?\//, '').toLowerCase();
+const slugify = value => norm(value).replace(/ /g, '-') || 'writing';
+
+// One GitHub call lists the PDFs in the folder, so new uploads show up on their own
+async function fetchWritingFiles() {
+  const { repo, folder } = CONFIG.writings;
+  const key = `hub:writings:${CONFIG.user}/${repo}/${folder}`;
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(key) || 'null');
+    if (cached && Date.now() - cached.t < CONFIG.cacheMinutes * 60000) return cached.data;
+  } catch { /* ignore */ }
+
+  const path = folder.split('/').map(encodeURIComponent).join('/');
+  const res = await fetchWithTimeout(
+    `https://api.github.com/repos/${encodeURIComponent(CONFIG.user)}/${encodeURIComponent(repo)}/contents/${path}`, 8000);
+  if (!res.ok) return [];
+  const list = await res.json();
+  const data = Array.isArray(list)
+    ? list.filter(f => f.type === 'file' && /\.pdf$/i.test(f.name)).map(f => ({ path: f.path }))
+    : [];
+  try { sessionStorage.setItem(key, JSON.stringify({ t: Date.now(), data })); } catch { /* ignore */ }
+  return data;
+}
+
+function buildWriting(entry, used) {
+  const fileName = decodeURIComponent(String(entry.file).split('/').pop());
+  const stem = fileName.replace(/\.pdf$/i, '');
+  const year = String(entry.year || (stem.match(/(?:^|\D)((?:19|20)\d{2})(?:\D|$)/) || [])[1] || '');
+  const title = entry.title || titleFromSlug(stem.replace(/(?:^|[-_\s])(?:19|20)\d{2}(?=[-_\s]|$)/, ' ').trim()) || stem;
+
+  let slug = slugify(entry.id || stem);
+  while (used.has(slug)) slug += '-2';
+  used.add(slug);
+
+  const authors = Array.isArray(entry.authors) ? entry.authors.join(', ') : (entry.authors || '');
+  const venue = entry.venue || '';
+  const description = entry.description || '';
+
+  return {
+    id: `writing:${slug}`,
+    slug,
+    kind: 'writing',
+    title,
+    authors,
+    venue,
+    year,
+    description,
+    pages: 0,
+    place: null,
+    url: `?read=${encodeURIComponent(slug)}`,
+    file: new URL(entry.file, location.href).href,
+    fileName,
+    cover: entry.cover ? new URL(entry.cover, location.href).href : '',
+    previews: [],
+    updated: entry.date || (year ? `${year}-01-01` : ''),
+    searchText: norm([title, authors, venue, year, description, stem, 'writing writings publication paper pdf'].join(' ')),
+  };
+}
+
+async function loadWritings() {
+  let entries = [];
+  let note = '';
+  try {
+    const res = await fetch(CONFIG.writings.manifest, { cache: 'no-cache' });
+    if (res.ok) {
+      try { entries = JSON.parse(await res.text()); } catch (err) {
+        note = `${CONFIG.writings.manifest} could not be read (${err.message}). Check commas and quotes in the file.`;
+      }
+    }
+  } catch { /* no manifest yet */ }
+  if (!Array.isArray(entries)) entries = [];
+  entries = entries.filter(e => e && typeof e.file === 'string' && e.file.trim());
+
+  if (CONFIG.writings.autoDiscover) {
+    try {
+      const listed = new Set(entries.map(e => fileKey(e.file)));
+      for (const f of await fetchWritingFiles()) {
+        if (!listed.has(fileKey(f.path))) entries.push({ file: f.path });
+      }
+    } catch { /* GitHub unreachable: the manifest alone is used */ }
+  }
+
+  const used = new Set();
+  return { writings: entries.map(e => buildWriting(e, used)), note };
+}
+
+function writingDetails(site) {
+  return [site.venue, site.year, site.pages && `${site.pages} ${site.pages === 1 ? 'page' : 'pages'}`].filter(Boolean).join(', ');
+}
+
+/* ---------- PDF.js, loaded only when a writing is shown ---------- */
+let pdfjsPromise = null;
+const pdfCache = new Map();
+
+function loadPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  pdfjsPromise ||= new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = CONFIG.pdfjs;
+    script.onload = () => {
+      const lib = window.pdfjsLib;
+      if (!lib) { reject(new Error('PDF.js did not start')); return; }
+      lib.GlobalWorkerOptions.workerSrc = CONFIG.pdfjsWorker;
+      resolve(lib);
+    };
+    script.onerror = () => { pdfjsPromise = null; reject(new Error('the PDF viewer could not be loaded')); };
+    document.head.append(script);
+  });
+  return pdfjsPromise;
+}
+
+// Each PDF is opened once and shared by its panel cover and the reader.
+// Only the parts that are drawn are downloaded (byte ranges).
+function openPdf(url) {
+  if (!pdfCache.has(url)) {
+    const job = loadPdfJs().then(lib => lib.getDocument({
+      url,
+      disableAutoFetch: true,
+      disableStream: true,
+      isEvalSupported: false,
+    }).promise);
+    job.catch(() => pdfCache.delete(url));
+    pdfCache.set(url, job);
+  }
+  return pdfCache.get(url);
+}
+
+/* =====================================================================
    State & elements
    ===================================================================== */
 const state = {
@@ -507,6 +649,7 @@ const el = {
   search: $('#search'),
   sort: $('#sort'),
   viewButtons: [...document.querySelectorAll('button[data-view]')],
+  viewGroup: document.querySelector('.views[aria-label="View"]'),
   kindButtons: [...document.querySelectorAll('button[data-kind]')],
 };
 
@@ -683,13 +826,16 @@ const sizeObserver = new ResizeObserver(entries => {
 let viewObserver;
 
 function makeCard(site) {
+  const isWriting = site.kind === 'writing';
   const card = document.createElement('a');
   card.className = 'card';
   card.href = site.url;
-  card.target = '_blank';
-  card.rel = 'noopener';
+  if (!isWriting) {
+    card.target = '_blank';
+    card.rel = 'noopener';
+  }
   card.dataset.id = site.id;
-  card.title = `Open ${site.title} in a new tab`;
+  card.title = isWriting ? `Read ${site.title}` : `Open ${site.title} in a new tab`;
 
   const preview = document.createElement('div');
   preview.className = 'preview';
@@ -705,7 +851,13 @@ function makeCard(site) {
 
   const place = document.createElement('p');
   place.className = 'place';
-  if (site.place) {
+  if (isWriting) {
+    place.textContent = 'Writing';
+    const details = document.createElement('span');
+    details.className = 'coords';
+    details.textContent = writingDetails(site);
+    place.append(details);
+  } else if (site.place) {
     place.textContent = placeLabel(site.place);
     const coords = document.createElement('span');
     coords.className = 'coords';
@@ -718,14 +870,24 @@ function makeCard(site) {
 
   meta.append(h, place);
 
-  if (site.description) {
+  const text = isWriting ? (site.authors || site.description) : site.description;
+  if (text) {
     const d = document.createElement('p');
     d.className = 'desc';
-    d.textContent = site.description;
+    d.textContent = text;
     meta.append(d);
   }
 
   card.append(preview, meta);
+
+  if (isWriting) {
+    preview.classList.add('is-doc');
+    card.addEventListener('click', e => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return; // new tab still works
+      e.preventDefault();
+      openReader(site);
+    });
+  }
 
   card.addEventListener('mouseenter', () => setActive(site.id, true));
   card.addEventListener('mouseleave', () => setActive(site.id, false));
@@ -743,6 +905,12 @@ async function resolvePreview(site, card) {
   site.previewKind = 'pending';
   const box = card.querySelector('.preview');
 
+  if (site.kind === 'writing') {
+    site.previewKind = 'doc';
+    renderCover(site, card, box);
+    return;
+  }
+
   for (const src of site.previews) {
     if (await canLoadImage(src)) {
       const img = document.createElement('img');
@@ -756,6 +924,39 @@ async function resolvePreview(site, card) {
   }
   site.previewKind = 'live';
   refreshLive();
+}
+
+// First page of the PDF as a sheet on the panel (or the cover image from writings.json)
+async function renderCover(site, card, box) {
+  if (site.cover && await canLoadImage(site.cover)) {
+    const img = document.createElement('img');
+    img.className = 'sheet';
+    img.alt = '';
+    img.src = site.cover;
+    box.append(img);
+    return;
+  }
+  try {
+    const pdf = await openPdf(site.file);
+    site.pages = pdf.numPages;
+    const details = card.querySelector('.place .coords');
+    if (details) details.textContent = writingDetails(site);
+
+    const page = await pdf.getPage(1);
+    const base = page.getViewport({ scale: 1 });
+    const cssWidth = Math.max(box.clientWidth * 0.62, 120);
+    const scale = (cssWidth * Math.min(window.devicePixelRatio || 1, 2)) / base.width;
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    canvas.className = 'sheet';
+    canvas.width = Math.floor(viewport.width);
+    canvas.height = Math.floor(viewport.height);
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    box.append(canvas);
+  } catch {
+    box.querySelector('.initials').textContent = 'PDF';
+    card.querySelector('.place .coords').textContent = `${site.fileName} could not be opened`;
+  }
 }
 
 function liveCount() {
@@ -846,8 +1047,9 @@ function sortGrid() {
   const sorted = [...state.sites].sort((a, b) => {
     if (by === 'name') return a.title.localeCompare(b.title);
     if (by === 'place') {
-      const pa = a.place ? `${a.place.country} ${a.place.name}` : '\uffff';
-      const pb = b.place ? `${b.place.country} ${b.place.name}` : '\uffff';
+      const rank = s => s.place ? `${s.place.country} ${s.place.name}` : (s.kind === 'writing' ? '\uffff\uffff' : '\uffff');
+      const pa = rank(a);
+      const pb = rank(b);
       return pa.localeCompare(pb) || a.title.localeCompare(b.title);
     }
     return (b.updated || '').localeCompare(a.updated || '');
@@ -862,6 +1064,7 @@ function applyFilter(fit = false) {
   const shownPins = [];
   let shown = 0;
   let tools = 0;
+  let writings = 0;
 
   for (const site of state.sites) {
     const match = (state.kind === 'all' || site.kind === state.kind) &&
@@ -872,21 +1075,29 @@ function applyFilter(fit = false) {
       showMarker(entry, match);
       if (match) shownPins.push(entry.lngLat);
     }
-    if (match) { shown++; if (site.kind === 'tool') tools++; }
+    if (match) {
+      shown++;
+      if (site.kind === 'tool') tools++;
+      if (site.kind === 'writing') writings++;
+    }
   }
 
-  const places = shown - tools;
+  const places = shown - tools - writings;
   const count = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
-  const summary = `${count(places, 'place')}, ${count(tools, 'tool')}`;
-  if (tokens.length && !shown) setStatus(`Nothing matches “${raw}”. Try a place, a country or part of a name.`);
-  else if (!shown) setStatus(state.kind === 'tool' ? 'No tools yet.' : 'No places yet.');
+  const counts = { place: count(places, 'place'), tool: count(tools, 'tool'), writing: count(writings, 'writing') };
+  const summary = state.kind === 'all' ? Object.values(counts).join(', ') : counts[state.kind];
+  const empty = {
+    tool: 'No tools yet.',
+    writing: `No writings yet. Upload PDFs to the ${CONFIG.writings.folder} folder and list them in ${CONFIG.writings.manifest}.`,
+  };
+  if (tokens.length && !shown) setStatus(`Nothing matches “${raw}”. Try a place, a country, an author or part of a title.`);
+  else if (!shown) setStatus(empty[state.kind] || 'No places yet.');
   else if (tokens.length) setStatus(`${summary} match “${raw}”`);
   else setStatus(summary);
 
-  el.mapnote.hidden = tools === 0;
-  el.mapnote.textContent = tools === 1
-    ? '1 tool is listed in the panels only.'
-    : `${tools} tools are listed in the panels only.`;
+  const offMap = [tools && count(tools, 'tool'), writings && count(writings, 'writing')].filter(Boolean);
+  el.mapnote.hidden = offMap.length === 0;
+  el.mapnote.textContent = `${offMap.join(' and ')} ${tools + writings === 1 ? 'is' : 'are'} listed in the panels only.`;
 
   if (fit) fitMap(shownPins);
   refreshLive();
@@ -932,16 +1143,288 @@ function initControls() {
 
   el.viewButtons.forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
 
+  // Writings have no map, so the map and the view switch step aside while they are shown
   const setKind = kind => {
-    state.kind = ['all', 'place', 'tool'].includes(kind) ? kind : 'all';
+    state.kind = ['all', 'place', 'tool', 'writing'].includes(kind) ? kind : 'all';
     el.kindButtons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.kind === state.kind)));
+    el.layout.dataset.kind = state.kind;
+    el.viewGroup.hidden = state.kind === 'writing';
     store.set('hub:kind', state.kind);
+    requestAnimationFrame(() => map?.resize());
   };
-  setKind(state.kind);
+  const params = new URLSearchParams(location.search);
+  setKind(params.get('kind') || state.kind);
   el.kindButtons.forEach(b => b.addEventListener('click', () => { setKind(b.dataset.kind); applyFilter(true); }));
 
-  const q = new URLSearchParams(location.search).get('q');
+  const q = params.get('q');
   if (q) el.search.value = q;
+
+  initReaderControls();
+}
+
+/* =====================================================================
+   Reader — PDF pages drawn with PDF.js, only near the visible part
+   ===================================================================== */
+const reader = {
+  dialog: $('#reader'),
+  pages: $('#reader-pages'),
+  title: $('#reader-title'),
+  meta: $('#reader-meta'),
+  page: $('#reader-page'),
+  download: $('#reader-download'),
+  zoomButtons: [...document.querySelectorAll('#reader button[data-zoom]')],
+  site: null,
+  pdf: null,
+  slots: [],
+  observer: null,
+  fit: true,
+  width: 0,
+  ratio: Math.SQRT2,
+  token: 0,
+};
+
+const MIN_WIDTH = 240;
+const MAX_WIDTH = 2400;
+const MAX_FIT_WIDTH = 980;
+
+function setReadParam(slug) {
+  const url = new URL(location.href);
+  if (slug) url.searchParams.set('read', slug);
+  else url.searchParams.delete('read');
+  history.replaceState(null, '', url);
+}
+
+function fitWidth() {
+  const cs = getComputedStyle(reader.pages);
+  const inner = reader.pages.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  return Math.max(MIN_WIDTH, Math.min(inner, MAX_FIT_WIDTH));
+}
+
+function setZoomPressed() {
+  reader.zoomButtons.forEach(b => {
+    if (b.dataset.zoom === 'fit') b.setAttribute('aria-pressed', String(reader.fit));
+  });
+}
+
+function releaseSlot(slot) {
+  slot.task?.cancel();
+  slot.task = null;
+  slot.pending = 0;
+  slot.rendered = 0;
+  if (slot.canvas) {
+    slot.canvas.width = 0;   // frees the memory of large scans right away
+    slot.canvas.height = 0;
+    slot.canvas.remove();
+    slot.canvas = null;
+  }
+}
+
+async function renderSlot(slot) {
+  const target = Math.round(reader.width);
+  if (!reader.pdf || slot.rendered === target || slot.pending === target) return;
+  slot.task?.cancel();
+  slot.pending = target;
+  const token = reader.token;
+
+  try {
+    const page = await reader.pdf.getPage(slot.n);
+    if (token !== reader.token || !slot.near || slot.pending !== target) return;
+
+    const base = page.getViewport({ scale: 1 });
+    slot.el.style.aspectRatio = `${base.width} / ${base.height}`;
+    const pixels = Math.min(target * Math.min(window.devicePixelRatio || 1, 2), 4096);
+    const viewport = page.getViewport({ scale: pixels / base.width });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.floor(viewport.width);
+    canvas.height = Math.floor(viewport.height);
+    slot.task = page.render({ canvasContext: canvas.getContext('2d'), viewport });
+    await slot.task.promise;
+    slot.task = null;
+
+    if (token !== reader.token || !slot.near || slot.pending !== target) {
+      canvas.width = canvas.height = 0;
+      return;
+    }
+    if (slot.canvas) { slot.canvas.width = slot.canvas.height = 0; }
+    slot.el.replaceChildren(canvas);
+    slot.canvas = canvas;
+    slot.rendered = target;
+    slot.pending = 0;
+    delete slot.el.dataset.error;
+  } catch (err) {
+    if (err?.name === 'RenderingCancelledException') return;
+    slot.pending = 0;
+    slot.el.dataset.error = 'true';
+  }
+}
+
+function clearPages() {
+  reader.observer?.disconnect();
+  reader.slots.forEach(releaseSlot);
+  reader.slots = [];
+  reader.pages.replaceChildren();
+  reader.pages.scrollTop = 0;
+  reader.pages.scrollLeft = 0;
+}
+
+function buildSlots(count) {
+  reader.observer = new IntersectionObserver(entries => {
+    for (const entry of entries) {
+      const slot = reader.slots[Number(entry.target.dataset.page) - 1];
+      if (!slot) continue;
+      slot.near = entry.isIntersecting;
+      if (slot.near) renderSlot(slot);
+      else releaseSlot(slot);
+    }
+  }, { root: reader.pages, rootMargin: '150% 0px' });
+
+  reader.slots = Array.from({ length: count }, (_, i) => {
+    const node = document.createElement('div');
+    node.className = 'sheet-slot';
+    node.dataset.page = String(i + 1);
+    node.setAttribute('role', 'img');
+    node.setAttribute('aria-label', `Page ${i + 1} of ${count}`);
+    node.style.aspectRatio = `1 / ${reader.ratio}`;
+    reader.pages.append(node);
+    reader.observer.observe(node);
+    return { el: node, n: i + 1, near: false, rendered: 0, pending: 0, task: null, canvas: null };
+  });
+}
+
+function layoutSlots() {
+  reader.pages.style.setProperty('--sheet-width', `${Math.round(reader.width)}px`);
+  reader.slots.forEach(slot => { if (slot.near) renderSlot(slot); });
+}
+
+function currentSlotIndex() {
+  const mark = reader.pages.scrollTop + reader.pages.clientHeight / 3;
+  let index = 0;
+  for (let i = 0; i < reader.slots.length; i++) {
+    if (reader.slots[i].el.offsetTop <= mark) index = i;
+    else break;
+  }
+  return index;
+}
+
+function updatePageLabel() {
+  if (!reader.slots.length) return;
+  reader.page.textContent = `Page ${currentSlotIndex() + 1} of ${reader.slots.length}`;
+}
+
+function setZoom(mode) {
+  if (!reader.pdf || !reader.slots.length) return;
+  const i = currentSlotIndex();
+  const slot = reader.slots[i].el;
+  const within = (reader.pages.scrollTop - slot.offsetTop) / Math.max(slot.offsetHeight, 1);
+
+  if (mode === 'fit') {
+    reader.fit = true;
+    reader.width = fitWidth();
+  } else {
+    reader.fit = false;
+    const factor = mode === 'in' ? 1.25 : 0.8;
+    reader.width = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, reader.width * factor));
+  }
+  setZoomPressed();
+  layoutSlots();
+
+  // keep the same spot of the same page in view
+  reader.pages.scrollTop = slot.offsetTop + within * slot.offsetHeight;
+  reader.pages.scrollLeft = (reader.pages.scrollWidth - reader.pages.clientWidth) / 2;
+  updatePageLabel();
+}
+
+async function openReader(site) {
+  const token = ++reader.token;
+  clearPages();
+  reader.site = site;
+  reader.pdf = null;
+  reader.fit = true;
+  setZoomPressed();
+
+  reader.title.textContent = site.title;
+  reader.meta.textContent = [site.authors, site.venue, site.year].filter(Boolean).join(', ');
+  reader.download.href = site.file;
+  reader.download.setAttribute('download', site.fileName);
+  reader.page.textContent = 'Loading pages…';
+
+  if (!reader.dialog.open) reader.dialog.showModal();
+  setReadParam(site.slug);
+  reader.pages.focus({ preventScroll: true });
+
+  try {
+    const pdf = await openPdf(site.file);
+    if (token !== reader.token) return;
+    const first = await pdf.getPage(1);
+    if (token !== reader.token) return;
+
+    const vp = first.getViewport({ scale: 1 });
+    reader.pdf = pdf;
+    reader.ratio = vp.height / vp.width;
+    reader.width = fitWidth();
+    reader.pages.style.setProperty('--sheet-width', `${Math.round(reader.width)}px`);
+    buildSlots(pdf.numPages);
+    updatePageLabel();
+  } catch (err) {
+    if (token !== reader.token) return;
+    reader.page.textContent = '';
+    const msg = document.createElement('p');
+    msg.className = 'reader-error';
+    msg.textContent = err?.name === 'MissingPDFException'
+      ? `${site.fileName} was not found. Check that the file is uploaded and that its path in ${CONFIG.writings.manifest} matches.`
+      : `This PDF could not be shown here (${err?.message || 'unknown error'}). Download it to open it on your device.`;
+    reader.pages.replaceChildren(msg);
+  }
+}
+
+function initReaderControls() {
+  $('#reader-close').addEventListener('click', () => reader.dialog.close());
+
+  reader.dialog.addEventListener('close', () => {
+    reader.token++;
+    clearPages();
+    reader.pdf = null;
+    reader.site = null;
+    reader.page.textContent = '';
+    setReadParam(null);
+  });
+
+  reader.zoomButtons.forEach(b => b.addEventListener('click', () => setZoom(b.dataset.zoom)));
+
+  reader.dialog.addEventListener('keydown', e => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.target.closest('a, button') && (e.key === 'Enter' || e.key === ' ')) return;
+    if (e.key === '+' || e.key === '=') { e.preventDefault(); setZoom('in'); }
+    else if (e.key === '-' || e.key === '_') { e.preventDefault(); setZoom('out'); }
+    else if (e.key === '0') { e.preventDefault(); setZoom('fit'); }
+  });
+
+  let ticking = false;
+  reader.pages.addEventListener('scroll', () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => { ticking = false; updatePageLabel(); });
+  }, { passive: true });
+
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    if (!reader.dialog.open || !reader.fit) return;
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => setZoom('fit'), 200);
+  });
+}
+
+// hub.html?read=<name> opens that writing straight away
+function openFromUrl() {
+  const slug = new URLSearchParams(location.search).get('read');
+  if (!slug) return;
+  const site = state.sites.find(s => s.kind === 'writing' && s.slug === slug);
+  if (site) openReader(site);
+  else {
+    setStatus(`No writing called “${slug}” is listed. It may have been renamed or removed.`, true);
+    setReadParam(null);
+  }
 }
 
 /* =====================================================================
@@ -953,37 +1436,43 @@ async function init() {
   initControls();
   setView(['both', 'panels', 'map'].includes(state.view) ? state.view : 'both');
 
-  setStatus(`Looking up ${CONFIG.user}’s websites on GitHub…`);
+  setStatus(`Looking up ${CONFIG.user}’s websites and writings…`);
 
-  let repos;
-  try {
-    repos = await fetchRepos();
-  } catch (err) {
-    setStatus(err.status === 403 || err.status === 429
+  const [repoResult, { writings, note }] = await Promise.all([
+    fetchRepos().then(repos => ({ repos }), error => ({ error })),
+    loadWritings(),
+  ]);
+
+  // A failed repository list still leaves the writings readable
+  let problem = note;
+  let sites = [];
+  if (repoResult.error) {
+    const err = repoResult.error;
+    problem = err.status === 403 || err.status === 429
       ? 'GitHub only lets one network read the repository list 60 times an hour, and that limit is used up. Reload in a few minutes.'
       : err.status === 404
         ? `GitHub has no user called “${CONFIG.user}”. Check the user name at the top of app.js.`
-        : `The repository list could not be loaded (${err.message}). Check your connection and reload.`, true);
-    return;
+        : `The repository list could not be loaded (${err.message}). Check your connection and reload.`;
+  } else {
+    const self = currentRepoName()?.toLowerCase();
+    const exclude = new Set(CONFIG.exclude.map(n => n.toLowerCase()));
+    const pages = repoResult.repos.filter(r =>
+      r.has_pages &&
+      (CONFIG.includeForks || !r.fork) &&
+      !exclude.has(r.name.toLowerCase()) &&
+      r.name.toLowerCase() !== self);
+
+    if (pages.length) {
+      setStatus(`Reading ${pages.length} websites…`);
+      const metas = await mapLimit(pages, 6, readSite);
+      sites = pages.map((r, i) => buildSite(r, metas[i]));
+    }
   }
 
-  const self = currentRepoName()?.toLowerCase();
-  const exclude = new Set(CONFIG.exclude.map(n => n.toLowerCase()));
-  const pages = repos.filter(r =>
-    r.has_pages &&
-    (CONFIG.includeForks || !r.fork) &&
-    !exclude.has(r.name.toLowerCase()) &&
-    r.name.toLowerCase() !== self);
-
-  if (!pages.length) {
-    setStatus(`No GitHub Pages websites found for ${CONFIG.user}. Turn on Pages in a repository’s settings and it will appear here.`);
-    return;
-  }
-
-  setStatus(`Reading ${pages.length} websites…`);
-  const metas = await mapLimit(pages, 6, readSite);
-  state.sites = pages.map((r, i) => buildSite(r, metas[i]));
+  state.sites = [...sites, ...writings];
   render();
+  if (problem) setStatus(problem, true);
+  openFromUrl();
 }
 
 init();

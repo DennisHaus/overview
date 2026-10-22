@@ -7,6 +7,8 @@
   --muted: #8a8a8a;
   --line: #222222;
   --line-strong: #4a4a4a;
+  --water: #46586a;      /* same water tone as the map */
+  --sheet: #f2f2f0;      /* paper behind scanned pages */
 
   --radius: 10px;
   --font: "Geist Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
@@ -56,9 +58,12 @@ button, input, select { font: inherit; color: inherit; }
 
 .brand h1 {
   margin: 0;
-  font: 600 clamp(2rem, 4.5vw, 3rem)/1 var(--font);
+  font: 600 clamp(1.6rem, 3.6vw, 2.5rem)/1.05 var(--font);
   letter-spacing: -0.05em;
 }
+
+.brand h1 a { color: inherit; text-decoration: none; }
+.brand h1 a:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 6px; text-decoration-color: var(--line-strong); }
 
 .sub {
   margin: 10px 0 0;
@@ -210,6 +215,12 @@ button, input, select { font: inherit; color: inherit; }
 .layout[data-view="map"] { grid-template-columns: minmax(0, 1fr); }
 .layout[data-view="panels"] .mapwrap { display: none; }
 .layout[data-view="map"] .panels     { display: none; }
+
+/* writings have no map: panels take the full width */
+.layout[data-kind="writing"] { grid-template-columns: minmax(0, 1fr); }
+.layout[data-kind="writing"] .mapwrap { display: none; }
+.layout[data-kind="writing"] .panels { display: block; }
+.views[hidden] { display: none; }
 
 .panels {
   min-height: 0;
@@ -372,6 +383,204 @@ button, input, select { font: inherit; color: inherit; }
   overflow: hidden;
 }
 
+/* ---------- Writings on the panels ---------- */
+.preview.is-doc { background: var(--raise); }
+
+/* the first page sits like a sheet on a table, cut off by the panel edge */
+.preview.is-doc .sheet {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  width: 62%;
+  height: auto;
+  transform: translateX(-50%);
+  background: var(--sheet);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .4);
+}
+
+/* ---------- Reader ---------- */
+.reader {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.reader[open] { display: flex; flex-direction: column; }
+.reader::backdrop { background: var(--bg); }
+
+.reader-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  padding: 14px clamp(16px, 3vw, 32px);
+  border-bottom: 1px solid var(--line);
+}
+
+.reader-head { min-width: 0; flex: 1 1 320px; }
+
+.reader-head h2 {
+  margin: 0;
+  font: 500 1.05rem/1.3 var(--font);
+  letter-spacing: -0.02em;
+}
+
+.reader-head p { margin: 2px 0 0; color: var(--muted); font-size: .8rem; }
+.reader-head p:empty { display: none; }
+
+.reader-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.reader-page {
+  min-width: 11ch;
+  color: var(--muted);
+  font-size: .8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.reader-btn {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.reader-pages {
+  --sheet-width: 800px;
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 24px clamp(12px, 3vw, 32px) 64px;
+  outline: none;
+}
+
+.reader-pages:focus-visible { box-shadow: inset 0 0 0 2px var(--line-strong); }
+
+.sheet-slot {
+  width: var(--sheet-width);
+  margin: 0 auto 18px;
+  background: var(--sheet);
+}
+
+/* while a page is still being drawn */
+.sheet-slot:empty { background: var(--raise); border: 1px solid var(--line); }
+.sheet-slot[data-error]::after {
+  content: "This page could not be drawn.";
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--muted);
+  font-size: .8rem;
+}
+
+.sheet-slot canvas { display: block; width: 100%; height: auto; }
+
+.reader-error {
+  max-width: 52ch;
+  margin: 40px auto;
+  padding: 12px 14px;
+  border: 1px solid #5a2323;
+  border-radius: 8px;
+  background: #160909;
+  font-size: .85rem;
+}
+
+/* ---------- Landing ---------- */
+body.landing {
+  display: grid;
+  grid-template-rows: 1fr auto auto;
+  min-height: 100%;
+  height: auto;
+}
+
+.intro {
+  display: grid;
+  align-content: start;
+  gap: clamp(28px, 5vh, 56px);
+  padding: clamp(32px, 9vh, 112px) clamp(16px, 5vw, 64px) clamp(24px, 4vh, 48px);
+}
+
+.intro-head h1 {
+  margin: 0;
+  max-width: 14ch;
+  font: 600 clamp(2.6rem, 9vw, 7.5rem)/0.95 var(--font);
+  letter-spacing: -0.065em;
+}
+
+.intro-sub {
+  margin: clamp(14px, 2vh, 22px) 0 0;
+  max-width: 44ch;
+  color: var(--muted);
+  font-size: clamp(.95rem, 1.6vw, 1.15rem);
+  line-height: 1.45;
+}
+
+.intro-text { max-width: 64ch; }
+.intro-text p { margin: 0 0 12px; }
+.intro-text p:first-child { color: var(--ink); }
+.intro-text p + p { color: var(--muted); }
+
+.entries {
+  display: grid;
+  max-width: 64ch;
+  border-top: 1px solid var(--line);
+}
+
+.entry {
+  display: grid;
+  grid-template-columns: 11ch minmax(0, 1fr);
+  gap: 4px 16px;
+  align-items: baseline;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+  color: inherit;
+  text-decoration: none;
+}
+
+.entry-name { font-size: 1.05rem; font-weight: 500; letter-spacing: -0.02em; }
+.entry-desc { color: var(--muted); font-size: .85rem; }
+.entry:hover .entry-name { text-decoration: underline; text-underline-offset: 5px; text-decoration-thickness: 1px; }
+.entry:hover .entry-desc { color: var(--ink); }
+
+.waterline {
+  margin: 0;
+  height: clamp(110px, 20vh, 220px);
+}
+
+.waterline svg { display: block; width: 100%; height: 100%; }
+.water-fill { fill: var(--water); opacity: .45; }
+.water-line { fill: none; stroke: var(--ink); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.water-mean { stroke: var(--line-strong); stroke-width: 1; stroke-dasharray: 2 6; vector-effect: non-scaling-stroke; }
+
+.intro-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 24px;
+  padding: 16px clamp(16px, 5vw, 64px) 22px;
+  background: color-mix(in srgb, var(--water) 45%, var(--bg));
+  color: var(--ink);
+  font-size: .8rem;
+}
+
+.intro-foot p { margin: 0; }
+.intro-foot a { color: inherit; text-underline-offset: 3px; }
+
+@media (max-width: 560px) {
+  .entry { grid-template-columns: 1fr; }
+}
+
 /* ---------- Map pins, popups, controls ---------- */
 .pin-wrap {
   display: grid;
@@ -433,6 +642,10 @@ button, input, select { font: inherit; color: inherit; }
   .layout[data-view="map"] { grid-template-rows: minmax(0, 1fr); }
 
   .mapwrap { order: -1; border-left: 0; border-bottom: 1px solid var(--line); }
+  .layout[data-kind="writing"] { grid-template-rows: minmax(0, 1fr); }
+
+  .reader-bar { padding-block: 10px; }
+  .reader-page { min-width: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

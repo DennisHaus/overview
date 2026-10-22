@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Places, tools and writings | Entwerfen in der Zeit</title>
+  <meta name="description" content="Places, tools and writings from the doctoral research Entwerfen in der Zeit, as panels and on a map.">
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="masthead">
+    <div class="brand">
+      <h1><a href="./" title="Back to the start page">Entwerfen in der Zeit</a></h1>
+      <p class="sub">Places, tools and writings from the research. Places open in a new tab and sit on the map. Writings open in a reader with a download.</p>
+    </div>
+
+    <div class="controls">
+      <label class="search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <span class="visually-hidden">Search places, tools and writings</span>
+        <input id="search" type="search" placeholder="Search names, places, writings" autocomplete="off" spellcheck="false">
+        <kbd aria-hidden="true">/</kbd>
+      </label>
+
+      <label class="select">
+        <span class="visually-hidden">Sort</span>
+        <select id="sort">
+          <option value="updated">Recently updated</option>
+          <option value="name">Name A–Z</option>
+          <option value="place">By place</option>
+        </select>
+      </label>
+
+      <div class="views" role="group" aria-label="Show">
+        <button type="button" data-kind="all" aria-pressed="true">All</button>
+        <button type="button" data-kind="place" aria-pressed="false">Places</button>
+        <button type="button" data-kind="tool" aria-pressed="false">Tools</button>
+        <button type="button" data-kind="writing" aria-pressed="false">Writings</button>
+      </div>
+
+      <div class="views" role="group" aria-label="View">
+        <button type="button" data-view="both" aria-pressed="true">Panels + map</button>
+        <button type="button" data-view="panels" aria-pressed="false">Panels</button>
+        <button type="button" data-view="map" aria-pressed="false">Map</button>
+      </div>
+
+      <button id="about-open" class="about-btn" type="button" aria-haspopup="dialog">About</button>
+    </div>
+  </header>
+
+  <main id="layout" class="layout" data-view="both">
+    <section id="panels" class="panels" aria-label="Places, tools and writings">
+      <p id="status" class="status" role="status"></p>
+      <div id="grid" class="grid"></div>
+    </section>
+
+    <section class="mapwrap" aria-label="Map">
+      <div id="map"></div>
+      <p id="mapnote" class="mapnote" hidden></p>
+      <p class="credit">© OpenStreetMap contributors, OpenMapTiles, OpenFreeMap</p>
+    </section>
+  </main>
+
+  <dialog id="about" class="about" aria-labelledby="about-title">
+    <h2 id="about-title">About</h2>
+    <p>This platform is part of the doctoral research project by Dennis Häusler.</p>
+    <p>Contact: <a href="mailto:haeusler@arch.ethz.ch">haeusler@arch.ethz.ch</a></p>
+    <p class="about-copy">© ETH Zürich, Institute for Landscape and Urban Studies, Professur Voser</p>
+    <button id="about-close" class="about-close" type="button">Close</button>
+  </dialog>
+
+  <dialog id="reader" class="reader" aria-labelledby="reader-title">
+    <div class="reader-bar">
+      <div class="reader-head">
+        <h2 id="reader-title"></h2>
+        <p id="reader-meta"></p>
+      </div>
+      <div class="reader-tools">
+        <span id="reader-page" class="reader-page" aria-live="polite"></span>
+        <div class="views" role="group" aria-label="Zoom">
+          <button type="button" data-zoom="out" aria-label="Zoom out">−</button>
+          <button type="button" data-zoom="fit" aria-pressed="true">Fit width</button>
+          <button type="button" data-zoom="in" aria-label="Zoom in">+</button>
+        </div>
+        <a id="reader-download" class="about-btn reader-btn" href="#" download>Download PDF</a>
+        <button id="reader-close" class="about-btn reader-btn" type="button">Close</button>
+      </div>
+    </div>
+    <div id="reader-pages" class="reader-pages" tabindex="0" aria-label="Pages"></div>
+  </dialog>
+
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
