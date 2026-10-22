@@ -1,1 +1,10 @@
-[]
+[
+  {
+    "id": "hybrid-modelling",
+    "file": "writings/2026_HybridModelling.pdf",
+    "title": "Hybrid Modelling",
+    "authors": ["Dennis Häusler","Matthias Vollmer","Pia Fricker", "Martina Voser"],
+    "year": 2026,
+    "venue": "Journal of Digital Landscape Architecture"
+  }
+]
