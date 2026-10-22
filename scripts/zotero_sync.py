@@ -22,6 +22,12 @@ Zotero tags control what goes online:
 When an item has several PDFs and none is tagged, the one Zotero itself opens
 for the item (its "best attachment") is used, otherwise the oldest.
 
+Items without a DOI are looked up by title and author in Crossref, the public
+DOI register, so the website can link to the text when there is no PDF.
+
+Each run writes a table to the run's summary page on GitHub: for every writing,
+whether a PDF was copied and, if not, why.
+
 A PDF that is not in Zotero can be added by hand as writings/<item key>.pdf,
 where the item key is the eight-character key of the Zotero item.
 """
@@ -52,6 +58,8 @@ MANUAL_DIR = ROOT / 'writings'
 PDF_DIR = ROOT / 'writings' / 'zotero'
 STATE = PDF_DIR / 'sync-state.json'
 MAX_BYTES = 95 * 1024 * 1024   # GitHub refuses files over 100 MB
+CROSSREF = os.environ.get('CROSSREF_API', 'https://api.crossref.org/works')
+SUMMARY = os.environ.get('GITHUB_STEP_SUMMARY')   # set by GitHub Actions
 
 
 def canon(text):
@@ -110,22 +118,55 @@ def is_by_person(item):
 
 
 def pdf_attachment(item):
-    """The PDF to publish: tagged 'website: pdf', else Zotero's best attachment, else the oldest."""
+    """The PDF to publish and, when there is none, the reason.
+
+    Tagged 'website: pdf' first, else Zotero's best attachment, else the oldest."""
     children, _ = request(f'/users/{USER}/items/{item["key"]}/children', {'format': 'json'})
-    pdfs = [c['data'] for c in children
-            if c.get('data', {}).get('itemType') == 'attachment'
-            and c['data'].get('contentType') == 'application/pdf'
-            and c['data'].get('linkMode') in ('imported_file', 'imported_url')]  # linked files never reach the server
+    attachments = [c['data'] for c in children if c.get('data', {}).get('itemType') == 'attachment']
+    all_pdfs = [a for a in attachments if a.get('contentType') == 'application/pdf'
+                or str(a.get('filename', '')).lower().endswith('.pdf')]
+    pdfs = [a for a in all_pdfs if a.get('linkMode') in ('imported_file', 'imported_url')]
     if not pdfs:
-        return None
+        if any(a.get('linkMode') == 'linked_file' for a in all_pdfs):
+            return None, 'PDF is a linked file on your computer, not stored in Zotero'
+        if attachments:
+            return None, 'attachments, but no PDF among them'
+        return None, 'no attachment in Zotero'
     tagged = [p for p in pdfs if canon(TAG_PDF) in {canon(t.get('tag')) for t in p.get('tags', [])}]
     if tagged:
-        return tagged[0]
+        return tagged[0], ''
     best = (item.get('links', {}).get('attachment', {}).get('href') or '').rstrip('/').split('/')[-1]
     for p in pdfs:
         if p.get('key') == best:
-            return p
-    return sorted(pdfs, key=lambda p: p.get('dateAdded', ''))[0]
+            return p, ''
+    return sorted(pdfs, key=lambda p: p.get('dateAdded', ''))[0], ''
+
+
+def same_title(a, b):
+    a, b = canon(a), canon(b)
+    return bool(a and b) and (a == b or (min(len(a), len(b)) > 20 and (a.startswith(b) or b.startswith(a))))
+
+
+def crossref_doi(entry):
+    """A DOI for the item from Crossref, when title and author match."""
+    params = {'query.bibliographic': entry.get('title', ''), 'query.author': FAMILY, 'rows': 5, 'select': 'DOI,title'}
+    url = f'{CROSSREF}?{urllib.parse.urlencode(params)}'
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'entwerfen-in-der-zeit-sync (https://dennishaus.github.io/overview/)'})
+        with urllib.request.urlopen(req, timeout=30) as res:
+            found = json.loads(res.read()).get('message', {}).get('items', [])
+    except Exception:
+        return ''
+    for work in found:
+        if any(same_title(entry.get('title'), t) for t in work.get('title', [])):
+            return work.get('DOI', '')
+    return ''
+
+
+def specific_page(url):
+    """True for a link to a page, false for a bare homepage such as https://publisher.ch/."""
+    parts = urllib.parse.urlparse(str(url or ''))
+    return parts.scheme in ('http', 'https') and bool(parts.path.strip('/') or parts.query)
 
 
 def slug(text):
@@ -141,6 +182,10 @@ def issued_key(entry):
 def main():
     if not USER:
         sys.exit('Set ZOTERO_USER_ID, the numeric Zotero user ID.')
+    if not KEY:
+        print('::warning::ZOTERO_API_KEY is not set, so no PDFs can be copied. '
+              'Add it under Settings, Secrets and variables, Actions, with exactly this name.')
+    report = []
     PDF_DIR.mkdir(parents=True, exist_ok=True)
     state = json.loads(STATE.read_text()) if STATE.exists() else {}
     new_state, entries, used, kept = {}, [], set(), set()
@@ -167,18 +212,28 @@ def main():
 
         manual = MANUAL_DIR / f'{key}.pdf'
         target = PDF_DIR / f'{key}.pdf'
-        attachment = pdf_attachment(item) if KEY and not no_pdf else None
+        reason = ''
+        if no_pdf:
+            attachment, reason = None, 'tagged "website: no pdf"'
+        elif not KEY:
+            attachment, reason = None, 'no API key'
+        else:
+            attachment, reason = pdf_attachment(item)
         if attachment:
             chosen = attachment.get('title') or attachment.get('filename') or attachment['key']
             print(f'  {entry["title"][:60]}: PDF "{chosen}"')
-        if attachment:
             md5 = attachment.get('md5') or ''
             if state.get(key) == md5 and md5 and target.exists():
                 new_state[key] = md5
             else:
-                data, _ = request(f'/users/{USER}/items/{attachment["key"]}/file', raw=True)
-                if len(data) > MAX_BYTES:
-                    print(f'  skipped PDF of "{entry["title"]}": {len(data) // 1048576} MB is too large for GitHub')
+                data = None
+                try:
+                    data, _ = request(f'/users/{USER}/items/{attachment["key"]}/file', raw=True)
+                except urllib.error.HTTPError as err:
+                    reason = ('the PDF is not on zotero.org; check that Zotero syncs files to Zotero storage, not to WebDAV'
+                              if err.code == 404 else f'download failed ({err.code})')
+                if data and len(data) > MAX_BYTES:
+                    reason = f'PDF too large for GitHub ({len(data) // 1048576} MB)'
                     data = None
                 if data:
                     target.write_bytes(data)
@@ -187,8 +242,22 @@ def main():
             if target.exists():
                 entry['file'] = f'writings/zotero/{key}.pdf'
                 kept.add(target.name)
+                reason = ''
         if not entry['file'] and manual.exists() and not no_pdf:
             entry['file'] = f'writings/{key}.pdf'
+            reason = ''
+
+        # without a PDF the website links to the DOI, else to a specific page
+        if not entry['file'] and not entry.get('DOI'):
+            doi = crossref_doi(entry)
+            if doi:
+                entry['DOI'] = doi
+                print(f'  DOI found in Crossref for "{entry["title"][:60]}": {doi}')
+        link = (f'https://doi.org/{entry["DOI"]}' if entry.get('DOI')
+                else entry.get('URL') if specific_page(entry.get('URL')) else '')
+        report.append((entry['title'], 'PDF' if entry['file'] else (f'link: {link}' if link else 'nothing to open'), reason))
+        if not entry['file']:
+            print(f'  {entry["title"][:60]}: no PDF ({reason})')
 
         entries.append(entry)
 
@@ -203,6 +272,15 @@ def main():
     STATE.write_text(json.dumps(new_state, indent=2, sort_keys=True) + '\n')
     with_pdf = sum(1 for e in entries if e['file'])
     print(f'{len(entries)} writings by {GIVEN} {FAMILY}, {with_pdf} with PDF.')
+    if entries and not with_pdf and KEY:
+        print('::warning::No PDF could be copied. The table on the run summary page says why for each writing.')
+
+    if SUMMARY:
+        cell = lambda v: str(v).replace('|', '\\|')
+        rows = '\n'.join(f'| {cell(t)} | {cell(shown)} | {cell(why)} |' for t, shown, why in report)
+        with open(SUMMARY, 'a', encoding='utf-8') as f:
+            f.write(f'### Writings from Zotero\n\n{len(entries)} writings, {with_pdf} with PDF.\n\n'
+                    f'| Writing | Opens | Why no PDF |\n| --- | --- | --- |\n{rows}\n')
 
 
 if __name__ == '__main__':

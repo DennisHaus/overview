@@ -574,7 +574,9 @@ function buildWriting(entry, used) {
   const publisher = entry.publisher || '';
   const description = entry.description || '';
   const doi = String(entry.DOI || '').replace(/^https?:\/\/(dx\.)?doi\.org\//i, '').trim();
-  const link = doi ? `https://doi.org/${doi}` : (isUrl(entry.URL) ? entry.URL : '');
+  // without a PDF: the DOI, else a specific page of the publisher (a bare homepage does not count)
+  const specific = u => { try { const p = new URL(u); return Boolean(p.pathname.replace(/\/+$/, '') || p.search); } catch { return false; } };
+  const link = doi ? `https://doi.org/${doi}` : (isUrl(entry.URL) && specific(entry.URL) ? entry.URL : '');
 
   return {
     id: `writing:${slug}`,
