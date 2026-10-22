@@ -5,14 +5,29 @@
    Two neighbouring stations are shown at first: a river or lake station
    (FOEN) in one of the case study areas, and the closest other station,
    a weather station (MeteoSwiss) or another river or lake. Visitors can
-   add up to four stations and switch every measurement on and off.
-   Each line is scaled to its own range; precipitation hangs from the top
-   as hourly bars, as in a hydrograph. Data: api.existenz.ch.
+   add up to four stations, switch every measurement on and off, and
+   widen the time span from a week to ten years. The right edge is always
+   the present.
+
+   Week and month: live 10-minute readings from api.existenz.ch.
+   Year and 10 years: official daily means, rivers and lakes from the
+   FOEN data platform (data.bafu.admin.ch), weather from MeteoSwiss open
+   data (data.geo.admin.ch).
    ===================================================================== */
 const GAUGE = {
-  api: 'https://api.existenz.ch/apiv1',
+  live: 'https://api.existenz.ch/apiv1',
   app: 'entwerfen-in-der-zeit',     // Existenz asks apps to name themselves
-  days: 7,                          // length of the series shown (up to 31)
+  hydroArchive: 'https://data.bafu.admin.ch/api',
+  meteoArchive: 'https://data.geo.admin.ch/api/stac/v1/collections/ch.meteoschweiz.ogd-smn/items/',
+
+  ranges: {
+    week: { days: 7, source: 'live', bar: 3600000, per: 'per hour' },
+    month: { days: 31, source: 'live', bar: 3600000, per: 'per hour' },
+    year: { days: 365, source: 'archive', bar: 86400000, per: 'per day' },
+    decade: { days: 3653, source: 'archive', bar: 7 * 86400000, per: 'per week' },
+  },
+  defaultRange: 'week',
+
   pairWithinKm: 30,                 // farthest neighbour that is paired with the first station
   maxStations: 4,
   refreshMinutes: 10,
@@ -34,16 +49,17 @@ const GAUGE = {
   colors: ['#ededed', '#8fc1ea', '#e3b36f', '#a9d49b'],
 };
 
-// What is drawn for each kind of station; the line style tells the measurements apart
+// What is drawn for each kind of station. `live` are the codes of api.existenz.ch,
+// `archive` the codes of the daily means. The line style tells the measurements apart.
 const MEASURES = {
   hydro: [
-    { codes: ['height', 'height_abs'], label: 'Water level', style: 'm-level', primary: true },
-    { codes: ['flow', 'flow_ls'], label: 'Discharge', style: 'm-flow', primary: true },
-    { codes: ['temperature'], label: 'Water temperature', style: 'm-wtemp' },
+    { live: ['height', 'height_abs'], archive: 'W', archiveUnit: 'm', label: 'Water level', style: 'm-level', primary: true },
+    { live: ['flow', 'flow_ls'], archive: 'Q', archiveUnit: 'm³/s', label: 'Discharge', style: 'm-flow', primary: true },
+    { live: ['temperature'], archive: 'WT', archiveUnit: '°C', label: 'Water temperature', style: 'm-wtemp' },
   ],
   smn: [
-    { codes: ['tt'], label: 'Air temperature', style: 'm-air' },
-    { codes: ['rr'], label: 'Precipitation', style: 'm-rain', bars: true },
+    { live: ['tt'], archive: 'tre200d0', archiveUnit: '°C', label: 'Air temperature', style: 'm-air' },
+    { live: ['rr'], archive: 'rre150d0', archiveUnit: 'mm', label: 'Precipitation', style: 'm-rain', bars: true },
   ],
 };
 
@@ -52,6 +68,7 @@ const H = 200;
 const LINE_TOP = 62;     // lines stay below the precipitation bars
 const LINE_BOTTOM = 190;
 const RAIN_DEPTH = 50;   // tallest precipitation bar
+const DAY = 86400000;
 
 /* ---------- helpers ---------- */
 const $ = id => document.getElementById(id);
@@ -60,11 +77,13 @@ const still = matchMedia('(prefers-reduced-motion: reduce)');
 
 const norm = v => String(v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-const num = v => (v === null || v === undefined || v === '' ? NaN : Number(v));
+const num = v => (v === null || v === undefined || v === '' || v === '-' ? NaN : Number(v));
 const unitLabel = u => String(u || '').replace(/m3/g, 'm³');
 
 const timeFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Zurich', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const dateFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Zurich', weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 const dayFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Zurich', day: 'numeric', month: 'short' });
+const monthFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Zurich', month: 'short', year: 'numeric' });
 
 // Water levels move by centimetres, so metres always keep two decimals
 function formatValue(v, unit = '') {
@@ -74,14 +93,14 @@ function formatValue(v, unit = '') {
   return unit ? `${text} ${unit}` : text;
 }
 
-function fetchWithTimeout(url, ms = 10000) {
+function fetchWithTimeout(url, ms = 10000, options = {}) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
-  return fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(timer));
+  return fetch(url, { ...options, signal: ctrl.signal }).finally(() => clearTimeout(timer));
 }
 
-async function api(path, params = {}) {
-  const url = new URL(GAUGE.api + path);
+async function liveApi(path, params = {}) {
+  const url = new URL(GAUGE.live + path);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   url.searchParams.set('app', GAUGE.app);
   const res = await fetchWithTimeout(url);
@@ -107,7 +126,7 @@ async function cached(key, load) {
   return data;
 }
 
-// The API wraps results in { payload }, either a list or an object keyed by id
+// The live API wraps results in { payload }, either a list or an object keyed by id
 const entriesOf = json => {
   const p = json?.payload ?? json;
   if (Array.isArray(p)) return p.map(v => [v?.name ?? v?.id, v]);
@@ -156,10 +175,10 @@ function parseParams(json) {
 
 async function loadCatalogue() {
   const [hydro, smn, hydroParams, smnParams] = await Promise.all([
-    cached('gauge3:hydro:stations', async () => parseStations(await api('/hydro/locations'), 'hydro')),
-    cached('gauge3:smn:stations', async () => parseStations(await api('/smn/locations'), 'smn')).catch(() => []),
-    cached('gauge3:hydro:params', async () => parseParams(await api('/hydro/parameters'))).catch(() => ({})),
-    cached('gauge3:smn:params', async () => parseParams(await api('/smn/parameters'))).catch(() => ({})),
+    cached('gauge3:hydro:stations', async () => parseStations(await liveApi('/hydro/locations'), 'hydro')),
+    cached('gauge3:smn:stations', async () => parseStations(await liveApi('/smn/locations'), 'smn')).catch(() => []),
+    cached('gauge3:hydro:params', async () => parseParams(await liveApi('/hydro/parameters'))).catch(() => ({})),
+    cached('gauge3:smn:params', async () => parseParams(await liveApi('/smn/parameters'))).catch(() => ({})),
   ]);
   return { hydro, smn, all: [...hydro, ...smn], units: { hydro: hydroParams, smn: smnParams } };
 }
@@ -187,9 +206,12 @@ function neighbours(station, withinKm) {
     .sort((a, b) => a.km - b.km);
 }
 
-// Readings of one station: { code: [[ms, value], …] } sorted by time
-async function loadReadings(station) {
-  const json = await api(`/${station.kind}/daterange`, { locations: station.id, startdate: `-${GAUGE.days} days`, enddate: 'now' });
+/* ---------- readings ---------- */
+const sortByTime = list => list.sort((a, b) => a[0] - b[0]);
+
+// Live 10-minute readings: { code: [[ms, value], …] }
+async function loadLive(station, days) {
+  const json = await liveApi(`/${station.kind}/daterange`, { locations: station.id, startdate: `-${days} days`, enddate: 'now' });
   const out = {};
   for (const row of Array.isArray(json?.payload) ? json.payload : []) {
     const value = num(row.val);
@@ -197,36 +219,154 @@ async function loadReadings(station) {
     if (!row.par || !Number.isFinite(value) || !Number.isFinite(t)) continue;
     (out[row.par] ||= []).push([t, value]);
   }
-  for (const list of Object.values(out)) list.sort((a, b) => a[0] - b[0]);
+  for (const list of Object.values(out)) sortByTime(list);
   return out;
 }
 
-// 10-minute precipitation summed per hour
-function hourly(data) {
-  const sums = new Map();
-  for (const [t, v] of data) {
-    const hour = Math.floor(t / 3600000) * 3600000;
-    sums.set(hour, (sums.get(hour) || 0) + v);
+// Daily means of a river or lake station for one parameter (W, Q or WT)
+const HYDRO_DAILY = `query Daily($from: AWSDateTime!, $to: AWSDateTime!, $stationNos: [String!]!, $parameter: String!) {
+  water { observations {
+    data_1day_mean(where: {
+      station: { no: { _in: $stationNos } }
+      parameterName: { _eq: $parameter }
+      timestamp: { _gte: $from, _lt: $to }
+    } limit: 10000) { timestamp value tsName }
+  } }
+}`;
+
+async function hydroDaily(no, parameter, from, to) {
+  const res = await fetchWithTimeout(GAUGE.hydroArchive, 30000, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: HYDRO_DAILY, variables: { from, to, stationNos: [no], parameter } }),
+  });
+  if (!res.ok) throw new Error(`${res.status}`);
+  const json = await res.json();
+  if (json.errors?.length) throw new Error(json.errors[0].message);
+
+  // some stations publish two series side by side; the longest one without a suffix is used
+  const groups = new Map();
+  for (const row of json?.data?.water?.observations?.data_1day_mean || []) {
+    const t = Date.parse(row.timestamp);
+    const v = num(row.value);
+    if (!Number.isFinite(t) || !Number.isFinite(v)) continue;
+    const name = row.tsName || '';
+    if (!groups.has(name)) groups.set(name, []);
+    groups.get(name).push([t, v]);
   }
-  return [...sums.entries()].sort((a, b) => a[0] - b[0]);
+  const best = [...groups.entries()].sort((a, b) => (b[1].length - a[1].length) || (a[0].includes('_') - b[0].includes('_')))[0];
+  return best ? sortByTime(best[1]) : [];
 }
 
-// A station with the measurements it actually reported, or null when it has none
-async function loadStation(station) {
-  const readings = await loadReadings(station);
-  const series = [];
-  for (const m of MEASURES[station.kind]) {
-    const code = m.codes.find(c => readings[c]?.length > 1);
-    if (!code) continue;
-    const data = readings[code];
-    series.push({
-      key: `${station.key}:${m.label}`, m, data,
-      unit: unitLabel(state.catalogue.units[station.kind][code]?.unit),
-      hourly: m.bars ? hourly(data) : [],
-      points: [],
-    });
+async function loadHydroArchive(station) {
+  const to = new Date(Date.now() + DAY).toISOString();
+  const from = new Date(Date.now() - (GAUGE.ranges.decade.days + 2) * DAY).toISOString();
+  const params = MEASURES.hydro.map(m => m.archive);
+  const lists = await Promise.all(params.map(p => hydroDaily(station.id, p, from, to).catch(() => [])));
+  return Object.fromEntries(params.map((p, i) => [p, lists[i]]));
+}
+
+// Daily values of a weather station from the MeteoSwiss open data files
+async function loadMeteoArchive(station) {
+  const res = await fetchWithTimeout(GAUGE.meteoArchive + station.id.toLowerCase(), 15000);
+  if (!res.ok) throw new Error(`${res.status}`);
+  const item = await res.json();
+  const fromYear = new Date(Date.now() - GAUGE.ranges.decade.days * DAY).getUTCFullYear();
+  const hrefs = Object.values(item.assets || {})
+    .map(a => a.href)
+    .filter(h => /_d_(historical|recent)[^/]*\.csv$/i.test(h || ''))
+    .filter(h => { const m = h.match(/_(\d{4})-(\d{4})\.csv$/); return !m || Number(m[2]) >= fromYear; });
+
+  const codes = MEASURES.smn.map(m => m.archive);
+  const byCode = Object.fromEntries(codes.map(c => [c, new Map()]));
+  const texts = await Promise.all(hrefs.map(h => fetchWithTimeout(h, 30000).then(r => (r.ok ? r.text() : '')).catch(() => '')));
+
+  for (const text of texts) {
+    const lines = text.split(/\r?\n/);
+    const head = (lines[0] || '').split(';').map(h => h.trim().replace(/^"|"$/g, ''));
+    const ti = head.indexOf('reference_timestamp');
+    const idx = codes.map(c => head.indexOf(c));
+    if (ti < 0) continue;
+    for (let i = 1; i < lines.length; i++) {
+      const cells = lines[i].split(';');
+      const m = (cells[ti] || '').match(/(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
+      if (!m) continue;
+      const t = Date.UTC(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0));
+      codes.forEach((c, k) => {
+        const v = num(cells[idx[k]]);
+        if (idx[k] >= 0 && Number.isFinite(v)) byCode[c].set(t, v);
+      });
+    }
   }
-  return series.length ? { station, series } : null;
+  return Object.fromEntries(codes.map(c => [c, sortByTime([...byCode[c].entries()])]));
+}
+
+// Sums per bucket (hour, day or week), for precipitation bars
+function buckets(data, size) {
+  const sums = new Map();
+  for (const [t, v] of data) {
+    const b = Math.floor(t / size) * size;
+    sums.set(b, (sums.get(b) || 0) + v);
+  }
+  return sortByTime([...sums.entries()]);
+}
+
+// Means per bucket, so ten years of daily values become a calm weekly line
+function means(data, size) {
+  const acc = new Map();
+  for (const [t, v] of data) {
+    const b = Math.floor(t / size) * size;
+    const a = acc.get(b) || [0, 0];
+    a[0] += v;
+    a[1] += 1;
+    acc.set(b, a);
+  }
+  return sortByTime([...acc.entries()].map(([t, [sum, n]]) => [t + size / 2, sum / n]));
+}
+
+const archiveCache = new Map();
+
+// The measurements of one station for a time span: [] when it has none
+async function loadSeries(station, rangeKey) {
+  const range = GAUGE.ranges[rangeKey];
+  const t0 = Date.now() - range.days * DAY;
+  const series = [];
+
+  if (range.source === 'live') {
+    const readings = await loadLive(station, range.days);
+    for (const m of MEASURES[station.kind]) {
+      const code = m.live.find(c => readings[c]?.length > 1);
+      if (!code) continue;
+      const data = readings[code];
+      series.push({ key: `${station.key}:${m.label}`, m, data, unit: unitLabel(state.catalogue.units[station.kind][code]?.unit), gap: 3 * 3600000 });
+    }
+  } else {
+    if (!archiveCache.has(station.key)) {
+      const job = station.kind === 'hydro' ? loadHydroArchive(station) : loadMeteoArchive(station);
+      job.catch(() => archiveCache.delete(station.key));
+      archiveCache.set(station.key, job);
+    }
+    const readings = await archiveCache.get(station.key);
+    const weekly = range.days > 400;
+    for (const m of MEASURES[station.kind]) {
+      const daily = (readings[m.archive] || []).filter(([t]) => t >= t0);
+      if (daily.length < 2) continue;
+      series.push({
+        key: `${station.key}:${m.label}`, m, unit: m.archiveUnit,
+        data: m.bars || !weekly ? daily : means(daily, 7 * DAY),
+        raw: daily,
+        gap: weekly ? 22 * DAY : 3 * DAY,
+        reach: weekly ? 4 * DAY : 1.5 * DAY,
+        kind: weekly ? 'weekly mean' : 'daily mean',
+      });
+    }
+  }
+
+  for (const s of series) {
+    s.bars = s.m.bars ? buckets(s.raw || s.data, range.bar) : [];
+    s.points = [];
+  }
+  return series;
 }
 
 /* ---------- state and elements ---------- */
@@ -247,16 +387,20 @@ const el = {
   next: $('gauge-next'),
   note: $('gauge-note'),
   list: $('gauge-stations'),
+  rangeButtons: [...document.querySelectorAll('#gauge-range button')],
 };
 
 const state = {
   catalogue: null,
+  range: GAUGE.defaultRange,
   shown: [],            // [{ station, series, color }]
   hidden: new Set(),    // series switched off
   t0: 0,
   t1: 0,
   token: 0,
 };
+
+const isLive = () => GAUGE.ranges[state.range].source === 'live';
 
 function nextColor() {
   const used = new Set(state.shown.map(e => e.color));
@@ -276,11 +420,11 @@ function scaleFor(data) {
   return { mean: sum / data.length, y: v => LINE_BOTTOM - ((v - (lo - pad)) / (span + 2 * pad)) * (LINE_BOTTOM - LINE_TOP) };
 }
 
-function pathFrom(points) {
+function pathFrom(points, gap) {
   let d = '';
   let last = null;
   for (const p of points) {
-    d += `${!last || p.t - last.t > 3 * 3600000 ? 'M' : 'L'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`; // gaps over 3 h break the line
+    d += `${!last || p.t - last.t > gap ? 'M' : 'L'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`; // missing readings break the line
     last = p;
   }
   return d;
@@ -301,10 +445,10 @@ function revealLine(path) {
   }, { once: true });
 }
 
+// The right edge is always now
 function updateTimeRange() {
-  const ends = state.shown.flatMap(e => e.series.map(s => s.data[s.data.length - 1][0]));
-  state.t1 = ends.length ? Math.max(...ends) : Date.now();
-  state.t0 = state.t1 - GAUGE.days * 86400000;
+  state.t1 = Date.now();
+  state.t0 = state.t1 - GAUGE.ranges[state.range].days * DAY;
 }
 
 function draw(animate) {
@@ -314,6 +458,7 @@ function draw(animate) {
   el.mean.style.display = 'none';
   el.dot.hidden = true;
   const motion = animate && !still.matches;
+  const range = GAUGE.ranges[state.range];
   let filled = false;
 
   for (const entry of state.shown) {
@@ -321,12 +466,13 @@ function draw(animate) {
       if (state.hidden.has(s.key)) continue;
 
       if (s.m.bars) {
-        const max = Math.max(2, ...s.hourly.map(([, v]) => v)); // 2 mm/h keeps drizzle small
-        const width = Math.max((3600000 / (state.t1 - state.t0)) * W, 1);
-        for (const [t, v] of s.hourly) {
-          if (v <= 0 || t < state.t0) continue;
+        const visible = s.bars.filter(([t]) => t >= state.t0);
+        const max = Math.max(range.bar <= 3600000 ? 2 : 10, ...visible.map(([, v]) => v)); // keeps drizzle small
+        const width = Math.max((range.bar / (state.t1 - state.t0)) * W, 0.6);
+        for (const [t, v] of visible) {
+          if (v <= 0) continue;
           const r = document.createElementNS(SVG, 'rect');
-          r.setAttribute('x', xOf(t).toFixed(1));
+          r.setAttribute('x', xOf(t).toFixed(2));
           r.setAttribute('y', '0');
           r.setAttribute('width', width.toFixed(2));
           r.setAttribute('height', ((v / max) * RAIN_DEPTH).toFixed(1));
@@ -342,11 +488,11 @@ function draw(animate) {
       if (s.points.length < 2) continue;
 
       const path = document.createElementNS(SVG, 'path');
-      path.setAttribute('d', pathFrom(s.points));
+      path.setAttribute('d', pathFrom(s.points, s.gap));
       path.setAttribute('class', `g-line ${s.m.style}`);
       path.style.setProperty('--c', entry.color);
       el.lines.append(path);
-      if (motion && !s.m.style.match(/m-wtemp|m-air/)) revealLine(path); // dotted and dashed lines fade in instead
+      if (motion && s.m.style === 'm-level') revealLine(path); // the other line styles fade in
 
       // the first water line carries the water body and the pulsing latest reading
       if (s.m.primary && !filled) {
@@ -370,15 +516,21 @@ function draw(animate) {
     el.plot.classList.add('is-revealing');
     requestAnimationFrame(() => requestAnimationFrame(() => el.plot.classList.remove('is-revealing')));
   }
-  el.from.textContent = state.shown.length ? dayFmt.format(state.t0) : '';
-  el.to.textContent = !state.shown.length ? '' : Date.now() - state.t1 < 2 * 3600000 ? 'now' : dayFmt.format(state.t1);
+  const label = range.days > 40 ? monthFmt : dayFmt;
+  el.from.textContent = state.shown.length ? label.format(state.t0) : '';
+  el.to.textContent = state.shown.length ? 'now' : '';
 }
 
 /* ---------- the station list on the right ---------- */
 function latestText(s) {
   if (s.m.bars) {
-    const total = s.data.filter(([t]) => t >= state.t1 - 86400000).reduce((a, [, v]) => a + v, 0);
-    return `${formatValue(total, s.unit)} in 24 h`;
+    const range = GAUGE.ranges[state.range];
+    if (range.source === 'live') {
+      const total = s.data.filter(([t]) => t >= state.t1 - DAY).reduce((a, [, v]) => a + v, 0);
+      return `${formatValue(total, s.unit)} in 24 h`;
+    }
+    const total = s.data.filter(([t]) => t >= state.t0).reduce((a, [, v]) => a + v, 0);
+    return range.days > 400 ? `${formatValue(total / (range.days / 365.25), s.unit)} a year` : `${formatValue(total, s.unit)} in 12 months`;
   }
   return formatValue(s.data[s.data.length - 1][1], s.unit);
 }
@@ -427,6 +579,15 @@ function renderList() {
     swatch.className = 'station-swatch';
     swatch.setAttribute('aria-hidden', 'true');
     head.append(text, swatch);
+    li.append(head);
+
+    if (!entry.series.length) {
+      const none = document.createElement('p');
+      none.className = 'station-meta';
+      none.textContent = isLive() ? 'No readings in this time span.' : 'No long-term records for this time span.';
+      li.append(none);
+      return li;
+    }
 
     // every measurement can be switched off and on; all start switched on
     const chips = document.createElement('div');
@@ -455,8 +616,7 @@ function renderList() {
       });
       chips.append(b);
     }
-
-    li.append(head, chips);
+    li.append(chips);
     return li;
   }));
 }
@@ -466,7 +626,7 @@ function setNote(text) {
   el.note.hidden = !text;
 }
 
-/* ---------- choosing stations ---------- */
+/* ---------- choosing stations and time spans ---------- */
 function applyShown(entries, animate = true) {
   stopSynthetic();
   state.shown = entries;
@@ -479,34 +639,37 @@ function applyShown(entries, animate = true) {
 // A station from a case study area, with its closest neighbour that has readings
 async function showPair() {
   const token = ++state.token;
-  setNote('Loading live readings…');
+  setNote('Loading readings…');
   const { hydro } = state.catalogue;
   const focus = hydro.filter(s => s.theme);
   const pool = (focus.length ? focus : hydro).slice().sort(() => Math.random() - 0.5);
   const current = state.shown[0]?.station.key;
 
   for (const station of pool.filter(s => s.key !== current).slice(0, 6)) {
-    let first = null;
-    try { first = await loadStation(station); } catch { /* try the next one */ }
+    let series = [];
+    try { series = await loadSeries(station, state.range); } catch { /* try the next one */ }
     if (token !== state.token) return;
-    if (!first) continue;
+    if (!series.length) continue;
 
     let second = null;
     for (const n of neighbours(station, GAUGE.pairWithinKm).slice(0, 4)) {
-      try { second = await loadStation(n.s); } catch { /* try the next neighbour */ }
+      try {
+        const s2 = await loadSeries(n.s, state.range);
+        if (s2.length) second = { station: n.s, series: s2 };
+      } catch { /* try the next neighbour */ }
       if (token !== state.token) return;
       if (second) break;
     }
 
     state.hidden.clear();
-    first.color = GAUGE.colors[0];
-    const entries = [first];
-    if (second) { second.color = GAUGE.colors[1]; entries.push(second); }
+    const entries = [{ station, series, color: GAUGE.colors[0] }];
+    if (second) entries.push({ ...second, color: GAUGE.colors[1] });
     applyShown(entries);
     setNote(second ? '' : `No other station within ${GAUGE.pairWithinKm} km. Add one with the search.`);
     return;
   }
-  showUnavailable();
+  if (isLive()) showUnavailable();
+  else setNote('Long-term records could not be loaded. Choose Week or Month for live readings.');
 }
 
 async function addStation(station) {
@@ -516,17 +679,18 @@ async function addStation(station) {
   }
   const token = ++state.token;
   setNote(`Loading ${station.title}…`);
-  let entry = null;
-  try { entry = await loadStation(station); } catch { /* reported below */ }
+  let series = [];
+  try { series = await loadSeries(station, state.range); } catch { /* reported below */ }
   if (token !== state.token) return;
-  if (!entry) {
-    setNote(`${station.title} has sent no readings in the last ${GAUGE.days} days.`);
+  if (!series.length) {
+    setNote(isLive()
+      ? `${station.title} has sent no readings in this time span.`
+      : `No long-term records of ${station.title} could be loaded.`);
     return;
   }
   const kept = state.shown.length >= GAUGE.maxStations ? state.shown.slice(0, GAUGE.maxStations - 1) : state.shown;
   state.shown = kept;
-  entry.color = nextColor();
-  applyShown([...kept, entry]);
+  applyShown([...kept, { station, series, color: nextColor() }]);
   setNote(state.shown.length >= GAUGE.maxStations ? `Up to ${GAUGE.maxStations} stations at once. The next one replaces the last.` : '');
 }
 
@@ -535,6 +699,26 @@ function removeStation(key) {
   for (const k of [...state.hidden]) if (k.startsWith(`${key}:`)) state.hidden.delete(k);
   applyShown(entries, false);
   setNote('');
+}
+
+async function setRange(rangeKey) {
+  if (rangeKey === state.range || !GAUGE.ranges[rangeKey]) return;
+  state.range = rangeKey;
+  el.rangeButtons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.range === rangeKey)));
+  if (!state.shown.length) return;
+
+  const token = ++state.token;
+  setNote(GAUGE.ranges[rangeKey].source === 'archive' ? 'Loading long-term records…' : 'Loading readings…');
+  const results = await Promise.all(state.shown.map(e => loadSeries(e.station, rangeKey).catch(() => [])));
+  if (token !== state.token) return;
+
+  applyShown(state.shown.map((e, i) => ({ ...e, series: results[i] })));
+  const missing = state.shown.filter(e => !e.series.length).map(e => e.station.title);
+  if (missing.length === state.shown.length && GAUGE.ranges[rangeKey].source === 'archive') {
+    setNote('Long-term records could not be loaded right now. Week and Month still show live readings.');
+  } else {
+    setNote(missing.length ? `No records for ${missing.join(' and ')} in this time span.` : '');
+  }
 }
 
 /* ---------- simulated line, while loading or when the data cannot be reached ---------- */
@@ -604,6 +788,7 @@ function initReadout() {
     const inside = e.clientY >= box.top && e.clientY <= box.bottom && e.clientX >= box.left && e.clientX <= box.right;
     if (!inside || el.plot.dataset.state !== 'live' || e.target.closest('a, button, input, .gauge-panel')) { hide(); return; }
 
+    const range = GAUGE.ranges[state.range];
     const ratio = (e.clientX - box.left) / box.width;
     const t = state.t0 + ratio * (state.t1 - state.t0);
     const blocks = [];
@@ -611,14 +796,17 @@ function initReadout() {
       const rows = [];
       for (const s of entry.series) {
         if (state.hidden.has(s.key)) continue;
-        const hit = s.m.bars ? nearest(s.hourly, Math.floor(t / 3600000) * 3600000, 0) : nearest(s.data, t, 40 * 60000);
+        const hit = s.m.bars
+          ? nearest(s.bars, Math.floor(t / range.bar) * range.bar, 0)
+          : nearest(s.data, t, s.reach || 40 * 60000);
         if (!hit) continue;
         const row = document.createElement('div');
         row.className = `readout-row ${s.m.style}`;
         const sw = document.createElement('span');
         sw.className = 'chip-swatch';
         const text = document.createElement('span');
-        text.textContent = `${s.m.label} ${formatValue(hit[1], s.unit)}${s.m.bars ? ' per hour' : ''}`;
+        const note = s.kind && !s.m.bars ? ` (${s.kind})` : '';
+        text.textContent = `${s.m.label} ${formatValue(hit[1], s.unit)}${s.m.bars ? ` ${range.per}` : note}`;
         row.append(sw, text);
         rows.push(row);
       }
@@ -636,7 +824,7 @@ function initReadout() {
 
     const head = document.createElement('div');
     head.className = 'readout-time';
-    head.textContent = timeFmt.format(t);
+    head.textContent = range.source === 'live' ? timeFmt.format(t) : dateFmt.format(t);
     el.readout.replaceChildren(head, ...blocks);
 
     el.cursor.hidden = false;
@@ -718,14 +906,14 @@ function initSearch() {
   });
   el.q.addEventListener('blur', () => setTimeout(close, 100));
   el.next.addEventListener('click', () => showPair());
+  el.rangeButtons.forEach(b => b.addEventListener('click', () => setRange(b.dataset.range)));
 }
 
 /* ---------- start ---------- */
 async function refresh() {
-  if (!state.shown.length || document.hidden) return;
-  const fresh = await Promise.all(state.shown.map(e => loadStation(e.station).catch(() => null)));
-  const entries = state.shown.map((e, i) => (fresh[i] ? { ...fresh[i], color: e.color } : e));
-  applyShown(entries, false);
+  if (!state.shown.length || document.hidden || !isLive()) return;
+  const fresh = await Promise.all(state.shown.map(e => loadSeries(e.station, state.range).catch(() => null)));
+  applyShown(state.shown.map((e, i) => (fresh[i]?.length ? { ...e, series: fresh[i] } : e)), false);
 }
 
 async function init() {

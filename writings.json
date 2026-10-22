@@ -13,42 +13,14 @@
 		"title-short": "Hybrid Terrain Modeling",
 		"URL": "https://doi.org/10.14627/537770039",
 		"author": [
-			{
-				"family": "Häusler",
-				"given": "Dennis"
-			},
-			{
-				"family": "Vollmer",
-				"given": "Matthias"
-			},
-			{
-				"family": "Voser",
-				"given": "Martina"
-			},
-			{
-				"family": "Fricker",
-				"given": "Pia"
-			}
+			{ "family": "Häusler", "given": "Dennis" },
+			{ "family": "Vollmer", "given": "Matthias" },
+			{ "family": "Voser", "given": "Martina" },
+			{ "family": "Fricker", "given": "Pia" }
 		],
-		"accessed": {
-			"date-parts": [
-				[
-					"2026",
-					7,
-					23
-				]
-			]
-		},
-		"issued": {
-			"date-parts": [
-				[
-					"2026",
-					5,
-					28
-				]
-			]
-		}
-		}
+		"accessed": { "date-parts": [["2026", 7, 23]] },
+		"issued": { "date-parts": [["2026", 5, 28]] }
+	},
 	{
 		"file": "",
 		"id": "http://zotero.org/users/18632873/items/LIV9RLN6",
@@ -58,36 +30,16 @@
 		"ISBN": "978-3-85676-437-1",
 		"language": "eng",
 		"number-of-pages": "87",
-		"publisher": "gta Verlag ETH Züurich",
+		"publisher": "gta Verlag ETH Zürich",
 		"publisher-place": "Zurich",
 		"source": "K10plus ISBN",
 		"title": "Probing Zurich",
 		"editor": [
-			{
-				"family": "Girot",
-				"given": "Christophe"
-			},
-			{
-				"family": "Häusler",
-				"given": "Dennis"
-			},
-			{
-				"family": "Vollmer",
-				"given": "Matthias"
-			},
-			{
-				"family": "Bravo",
-				"given": "Maite"
-			}
+			{ "family": "Girot", "given": "Christophe" },
+			{ "family": "Häusler", "given": "Dennis" },
+			{ "family": "Vollmer", "given": "Matthias" },
+			{ "family": "Bravo", "given": "Maite" }
 		],
-		"issued": {
-			"date-parts": [
-				[
-					"2022"
-				]
-			]
-		}
-
-
+		"issued": { "date-parts": [["2022"]] }
 	}
 ]

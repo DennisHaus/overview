@@ -560,8 +560,11 @@ function buildWriting(entry, used) {
   while (used.has(slug)) slug += '-2';
   used.add(slug);
 
+  // authors, or editors marked as such when a book only lists editors
+  const editors = cslNames(entry.editor);
   const authors = Array.isArray(entry.authors) ? entry.authors.join(', ')
-    : (entry.authors || cslNames(entry.author).join(', '));
+    : (entry.authors || cslNames(entry.author).join(', ') ||
+      (editors.length ? `${editors.join(', ')} (${editors.length === 1 ? 'ed.' : 'eds.'})` : ''));
   const venue = entry.venue || entry['container-title'] || '';
   const publisher = entry.publisher || '';
   const description = entry.description || '';
@@ -606,7 +609,7 @@ async function loadWritings() {
   } catch { /* no manifest yet */ }
   if (!Array.isArray(entries)) entries = [];
   const hasFile = e => typeof e.file === 'string' && e.file.trim();
-  entries = entries.filter(e => e && (hasFile(e) || e.DOI || isUrl(e.URL)));
+  entries = entries.filter(e => e && (hasFile(e) || e.DOI || isUrl(e.URL) || e.title));
 
   if (CONFIG.writings.autoDiscover) {
     try {
@@ -879,8 +882,10 @@ function makeCard(site) {
     card.rel = 'noopener';
   }
   card.dataset.id = site.id;
+  if (!site.url) card.removeAttribute('href'); // listed, but nothing to open yet
   card.title = readable ? `Read ${site.title}`
-    : isWriting ? `Open ${site.title} at the publisher (no PDF uploaded yet)` : `Open ${site.title} in a new tab`;
+    : isWriting ? (site.url ? `Open ${site.title} at the publisher (no PDF uploaded yet)` : `${site.title} (no PDF or link yet)`)
+    : `Open ${site.title} in a new tab`;
 
   const preview = document.createElement('div');
   preview.className = 'preview';
@@ -897,7 +902,7 @@ function makeCard(site) {
   const place = document.createElement('p');
   place.className = 'place';
   if (isWriting) {
-    place.textContent = readable ? 'Writing' : 'Writing, publisher page only';
+    place.textContent = readable ? 'Writing' : site.url ? 'Writing, publisher page only' : 'Writing, no PDF yet';
     const details = document.createElement('span');
     details.className = 'coords';
     details.textContent = writingDetails(site);

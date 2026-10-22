@@ -26,13 +26,22 @@ The graph runs along the bottom of the start page, behind the text. At first it 
 
 The panel on the right lists the shown stations, each in its own colour. Visitors can add up to four stations with the search (rivers, lakes and weather stations; nearby ones come first) and remove them again. Every measurement has a button that switches it off and on and shows its latest value; all start switched on. The line style tells the measurements apart: water level thick, discharge thin, water temperature dotted, air temperature dashed, and precipitation as hourly bars hanging from the top, as in a hydrograph. Each line is scaled to its own range. Hovering shows every value at that moment. The data refresh every ten minutes.
 
-The data come from [api.existenz.ch](https://api.existenz.ch), a free service that republishes the official FOEN and MeteoSwiss readings. Station lists are kept in the visitor's browser for a day. If the service cannot be reached, the line falls back to a simulated water level and says so.
+The time span runs from a week to ten years, with the right edge always at the present:
+
+| Span | Data | Source |
+| --- | --- | --- |
+| Week, Month | 10-minute readings, precipitation per hour | [api.existenz.ch](https://api.existenz.ch), which republishes the official FOEN and MeteoSwiss readings |
+| Year | Daily means, precipitation per day | Rivers and lakes: FOEN data platform ([data.bafu.admin.ch](https://data.bafu.admin.ch)). Weather: MeteoSwiss open data ([data.geo.admin.ch](https://data.geo.admin.ch)) |
+| 10 years | Weekly means of the daily values, precipitation per week | As for Year |
+
+Station lists are kept in the visitor's browser for a day; long-term records are loaded once per station and visit. If the live service cannot be reached, the line falls back to a simulated water level and says so. If the long-term records cannot be reached, Week and Month keep working.
 
 Settings at the top of `landing.js`:
 
 | Setting | Meaning |
 | --- | --- |
-| `days` | How many days of readings are drawn (up to 31) |
+| `ranges` | The time spans: length in days, data source and precipitation bar width |
+| `defaultRange` | The time span shown first |
 | `pairWithinKm` | Farthest neighbour that is paired with the first station |
 | `maxStations` | Most stations shown at once |
 | `focus` | The stations the first one is picked from, matched by water body and place, with their labels |
@@ -69,6 +78,8 @@ What the hub takes from each entry:
 | --- | --- |
 | `title` | Panel and reader title |
 | `author` | Author line, e.g. "Dennis Häusler, Matthias Vollmer" |
+| `editor` | Used when there are no authors, marked "(eds.)" |
+| `publisher` | Shown in the reader header after the journal or book |
 | `container-title` | Journal, proceedings or book |
 | `issued` | Year on the panel, and the date for sorting |
 | `DOI` (or `URL`) | DOI button in the reader |
@@ -77,7 +88,7 @@ What the hub takes from each entry:
 
 Other Zotero fields such as `ISBN` or `accessed` can stay; they are ignored.
 
-An entry without `"file"` still appears, as a panel that opens the DOI at the publisher. Add the file later and the panel opens the reader instead.
+An entry without a PDF still appears. With a DOI or URL, its panel opens the publisher page; without one, it is listed as "no PDF yet". Add the file later and the panel opens the reader instead. Books that list only editors (`editor` instead of `author`) show them as "(eds.)".
 
 Optional fields you can add to any entry:
 

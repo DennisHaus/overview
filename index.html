@@ -67,6 +67,12 @@
         </div>
         <button id="gauge-next" class="gauge-next" type="button" disabled>Another pair</button>
       </div>
+      <div id="gauge-range" class="gauge-range" role="group" aria-label="Time span">
+        <button type="button" data-range="week" aria-pressed="true">Week</button>
+        <button type="button" data-range="month" aria-pressed="false">Month</button>
+        <button type="button" data-range="year" aria-pressed="false">Year</button>
+        <button type="button" data-range="decade" aria-pressed="false">10 years</button>
+      </div>
       <p id="gauge-note" class="gauge-note" role="status">Loading live readings from Swiss stations…</p>
       <ol id="gauge-stations" class="gauge-stations"></ol>
     </aside>
@@ -74,7 +80,7 @@
 
   <footer class="intro-foot">
     <p>© ETH Zürich, Institute for Landscape and Urban Studies, <a href="https://voser.arch.ethz.ch" target="_blank" rel="noopener">Professur Voser</a></p>
-    <p>Live data: FOEN and MeteoSwiss, via api.existenz.ch</p>
+    <p>Data: FOEN and MeteoSwiss, live via api.existenz.ch</p>
     <p><a href="mailto:haeusler@arch.ethz.ch">haeusler@arch.ethz.ch</a></p>
   </footer>
 

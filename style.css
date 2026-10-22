@@ -669,6 +669,29 @@ body.landing {
 .gauge-next:hover:not(:disabled) { color: var(--ink); border-color: var(--line-strong); }
 .gauge-next:disabled { opacity: .5; cursor: default; }
 
+.gauge-range {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  text-shadow: none;
+}
+
+.gauge-range button {
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font-size: .75rem;
+  cursor: pointer;
+}
+
+.gauge-range button:hover { color: var(--ink); }
+.gauge-range button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+
 .gauge-note { margin: 0; max-width: 40ch; color: var(--muted); font-size: .76rem; }
 .gauge-note[hidden] { display: none; }
 
@@ -756,7 +779,11 @@ body.landing {
   border-top: 2px solid var(--c);
 }
 
-.m-flow .chip-swatch { border-top-width: 1px; }
+.m-flow .chip-swatch {
+  height: 2px;
+  border: 0;
+  background: repeating-linear-gradient(90deg, var(--c) 0 6px, transparent 6px 8px, var(--c) 8px 10px, transparent 10px 12px);
+}
 .m-wtemp .chip-swatch { border-top-style: dotted; }
 .m-air .chip-swatch { border-top-width: 1px; border-top-style: dashed; }
 .m-rain .chip-swatch { height: 8px; border: 0; background: var(--c); opacity: .55; }
@@ -764,7 +791,7 @@ body.landing {
 /* ---------- Live graph (behind) ---------- */
 .gauge-plot {
   position: absolute;
-  z-index: 0;
+  z-index: auto;   /* no own layer, so the readout can rise above the text and the panel */
   left: 0;
   right: 0;
   bottom: 0;
@@ -792,15 +819,14 @@ body.landing {
 }
 
 .g-line.m-level { stroke-width: 2; }
-.g-line.m-flow { stroke-width: 1.1; }
+.g-line.m-flow { stroke-width: 1.4; stroke-dasharray: 10 3 2 3; }
 .g-line.m-wtemp { stroke-width: 1.6; stroke-dasharray: 0.5 4; }
 .g-line.m-air { stroke-width: 1.1; stroke-dasharray: 6 4; }
 .g-bar { fill: var(--c); opacity: .4; transition: opacity 1.2s ease .2s; }
 
 .gauge-plot.is-revealing .water-fill,
 .gauge-plot.is-revealing .g-bar,
-.gauge-plot.is-revealing .g-line.m-wtemp,
-.gauge-plot.is-revealing .g-line.m-air { opacity: 0; transition: none; }
+.gauge-plot.is-revealing .g-line:not(.m-level) { opacity: 0; transition: none; }
 
 .gauge-dot {
   --c: var(--ink);
@@ -839,7 +865,7 @@ body.landing {
 
 .gauge-readout {
   position: absolute;
-  z-index: 3;
+  z-index: 4;
   top: 8px;
   display: grid;
   gap: 6px;
