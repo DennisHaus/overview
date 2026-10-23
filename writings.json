@@ -168,17 +168,14 @@
     "file": ""
   },
   {
-    "id": "probing-zurich",
-    "type": "book",
-    "collection-number": "26",
+    "id": "six-japanese-houses-traversed",
+    "type": "chapter",
+    "collection-number": "25",
     "collection-title": "Pamphlet",
-    "ISBN": "978-3-85676-437-1",
-    "language": "eng",
-    "number-of-pages": "87",
+    "container-title": "Terrain Vogue",
     "publisher": "gta Verlag",
     "publisher-place": "Zurich",
-    "source": "K10plus ISBN",
-    "title": "Probing Zurich",
+    "title": "Six Japanese Houses Traversed",
     "editor": [
       {
         "family": "Girot",
@@ -187,6 +184,117 @@
       {
         "family": "Häusler",
         "given": "Dennis"
+      },
+      {
+        "family": "Overath",
+        "given": "Luisa"
+      },
+      {
+        "family": "Myriam",
+        "given": "Uzor"
+      },
+      {
+        "family": "Vollmer",
+        "given": "Matthias"
+      }
+    ],
+    "issued": {
+      "date-parts": [
+        [
+          2022
+        ]
+      ]
+    },
+    "zotero": "LZ3AQR77",
+    "file": ""
+  },
+  {
+    "id": "what-s-the-point",
+    "type": "chapter",
+    "collection-number": "25",
+    "collection-title": "Pamphlet",
+    "container-title": "Transitional Space",
+    "publisher": "gta Verlag",
+    "publisher-place": "Zurich",
+    "title": "What's the Point?",
+    "contributor": [
+      {
+        "family": "Häusler",
+        "given": "Dennis"
+      },
+      {
+        "family": "Vollmer",
+        "given": "Matthias"
+      }
+    ],
+    "editor": [
+      {
+        "family": "Girot",
+        "given": "Christophe"
+      },
+      {
+        "family": "Häusler",
+        "given": "Dennis"
+      },
+      {
+        "family": "Overath",
+        "given": "Luisa"
+      },
+      {
+        "family": "Vollmer",
+        "given": "Matthias"
+      },
+      {
+        "family": "Maite",
+        "given": "Bravo"
+      }
+    ],
+    "issued": {
+      "date-parts": [
+        [
+          2022
+        ]
+      ]
+    },
+    "zotero": "5IPSW8YX",
+    "file": ""
+  },
+  {
+    "id": "the-kraken-of-zurich",
+    "type": "chapter",
+    "collection-number": "26",
+    "collection-title": "Pamphlet",
+    "container-title": "Probing Zurich",
+    "language": "eng",
+    "publisher": "gta Verlag",
+    "publisher-place": "Zurich",
+    "title": "The Kraken of Zurich",
+    "author": [
+      {
+        "family": "Häusler",
+        "given": "Dennis"
+      },
+      {
+        "family": "Vollmer",
+        "given": "Matthias"
+      },
+      {
+        "family": "Rebsamen",
+        "given": "Johannes"
+      }
+    ],
+    "editor": [
+      {
+        "family": "Girot",
+        "given": "Christophe"
+      },
+      {
+        "family": "Häusler",
+        "given": "Dennis"
+      },
+      {
+        "family": "Kaufmann",
+        "given": "Magdalena"
       },
       {
         "family": "Vollmer",
@@ -205,6 +313,65 @@
       ]
     },
     "zotero": "LIV9RLN6",
+    "file": ""
+  },
+  {
+    "id": "what-s-the-point-2",
+    "type": "chapter",
+    "collection-number": "26",
+    "collection-title": "Pamphlet",
+    "container-title": "Probing Zurich",
+    "publisher": "gta Verlag",
+    "publisher-place": "Zurich",
+    "title": "What's the Point?",
+    "author": [
+      {
+        "family": "Bravo",
+        "given": "Maite"
+      },
+      {
+        "family": "Häusler",
+        "given": "Dennis"
+      },
+      {
+        "family": "Kaufmann",
+        "given": "Magdalena"
+      },
+      {
+        "family": "Vollmer",
+        "given": "Matthias"
+      }
+    ],
+    "editor": [
+      {
+        "family": "Girot",
+        "given": "Christophe"
+      },
+      {
+        "family": "Häusler",
+        "given": "Dennis"
+      },
+      {
+        "family": "Kaufmann",
+        "given": "Magdalena"
+      },
+      {
+        "family": "Vollmer",
+        "given": "Matthias"
+      },
+      {
+        "family": "Maite",
+        "given": "Bravo"
+      }
+    ],
+    "issued": {
+      "date-parts": [
+        [
+          2022
+        ]
+      ]
+    },
+    "zotero": "7AMPURW3",
     "file": ""
   },
   {
