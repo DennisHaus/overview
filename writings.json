@@ -49,7 +49,7 @@
       ]
     },
     "zotero": "TA7YG9TJ",
-    "file": ""
+    "file": "writings/zotero/TA7YG9TJ.pdf"
   },
   {
     "id": "beyond-left-and-right-meanders-sediments-and-urban-imaginari",
@@ -75,6 +75,50 @@
     },
     "zotero": "S6TS9UE9",
     "file": ""
+  },
+  {
+    "id": "kyoto-garden-dialogues",
+    "type": "chapter",
+    "collection-number": "27",
+    "collection-title": "Pamphlet",
+    "container-title": "Terrain Vogue",
+    "page": "70-72",
+    "publisher": "gta Verlag",
+    "publisher-place": "Zurich",
+    "title": "Kyoto Garden Dialogues",
+    "editor": [
+      {
+        "family": "Bucher",
+        "given": "Annemarie"
+      },
+      {
+        "family": "Overath",
+        "given": "Luisa"
+      },
+      {
+        "family": "Myriam",
+        "given": "Uzor"
+      }
+    ],
+    "author": [
+      {
+        "family": "Vollmer",
+        "given": "Matthias"
+      },
+      {
+        "family": "Häusler",
+        "given": "Dennis"
+      }
+    ],
+    "issued": {
+      "date-parts": [
+        [
+          2023
+        ]
+      ]
+    },
+    "zotero": "LZ3AQR77",
+    "file": "writings/zotero/LZ3AQR77.pdf"
   },
   {
     "id": "spatial-1",
@@ -121,7 +165,7 @@
       ]
     },
     "zotero": "IPITIGL9",
-    "file": ""
+    "file": "writings/zotero/IPITIGL9.pdf"
   },
   {
     "id": "modeling-urban-complexity-in-point-clouds-and-sound",
@@ -172,51 +216,10 @@
     "type": "chapter",
     "collection-number": "25",
     "collection-title": "Pamphlet",
-    "container-title": "Terrain Vogue",
-    "publisher": "gta Verlag",
-    "publisher-place": "Zurich",
-    "title": "Six Japanese Houses Traversed",
-    "editor": [
-      {
-        "family": "Girot",
-        "given": "Christophe"
-      },
-      {
-        "family": "Häusler",
-        "given": "Dennis"
-      },
-      {
-        "family": "Overath",
-        "given": "Luisa"
-      },
-      {
-        "family": "Myriam",
-        "given": "Uzor"
-      },
-      {
-        "family": "Vollmer",
-        "given": "Matthias"
-      }
-    ],
-    "issued": {
-      "date-parts": [
-        [
-          2022
-        ]
-      ]
-    },
-    "zotero": "LZ3AQR77",
-    "file": ""
-  },
-  {
-    "id": "what-s-the-point",
-    "type": "chapter",
-    "collection-number": "25",
-    "collection-title": "Pamphlet",
     "container-title": "Transitional Space",
     "publisher": "gta Verlag",
     "publisher-place": "Zurich",
-    "title": "What's the Point?",
+    "title": "Six Japanese Houses Traversed",
     "contributor": [
       {
         "family": "Häusler",
@@ -313,10 +316,10 @@
       ]
     },
     "zotero": "LIV9RLN6",
-    "file": ""
+    "file": "writings/zotero/LIV9RLN6.pdf"
   },
   {
-    "id": "what-s-the-point-2",
+    "id": "what-s-the-point",
     "type": "chapter",
     "collection-number": "26",
     "collection-title": "Pamphlet",
@@ -372,7 +375,7 @@
       ]
     },
     "zotero": "7AMPURW3",
-    "file": ""
+    "file": "writings/zotero/7AMPURW3.pdf"
   },
   {
     "id": "bodies-of-water",
