@@ -39,5 +39,6 @@ jobs:
             echo 'Nothing changed in Zotero.'
           else
             git commit -m 'Sync writings from Zotero'
+            git pull --rebase -X theirs origin main
             git push
           fi
