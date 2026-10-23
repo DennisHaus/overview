@@ -571,6 +571,12 @@ function buildWriting(entry, used) {
     : (entry.authors || cslNames(entry.author).join(', ') ||
       (editors.length ? `${editors.join(', ')} (${editors.length === 1 ? 'ed.' : 'eds.'})` : ''));
   const venue = entry.venue || entry['container-title'] || '';
+  // "Published in" column of the list: the book series, else the journal, else the publisher
+  const series = [entry['collection-title'], entry['collection-number']].filter(Boolean).join(' ');
+  const journalTypes = ['article-journal', 'article-magazine', 'article-newspaper', 'periodical'];
+  const isJournal = journalTypes.includes(entry.type) ||
+    /journal|magazin|zeitschrift|review|quarterly|bulletin/i.test(entry['container-title'] || '');
+  const outlet = series || (isJournal && entry['container-title']) || entry.publisher || '';
   const publisher = entry.publisher || '';
   const description = entry.description || '';
   const doi = String(entry.DOI || '').replace(/^https?:\/\/(dx\.)?doi\.org\//i, '').trim();
@@ -585,6 +591,7 @@ function buildWriting(entry, used) {
     title,
     authors,
     venue,
+    outlet,
     publisher,
     year,
     description,
@@ -937,13 +944,16 @@ function makeCard(site) {
 
   // In the Writings view the panels become list rows: title, authors, year
   if (isWriting) {
+    const outlet = document.createElement('span');
+    outlet.className = 'w-outlet';
+    outlet.textContent = site.outlet;
     const authors = document.createElement('span');
     authors.className = 'w-authors';
     authors.textContent = site.authors;
     const year = document.createElement('span');
     year.className = 'w-year';
     year.textContent = site.year;
-    meta.append(authors, year);
+    meta.append(outlet, authors, year);
   }
 
   card.append(preview, meta);
@@ -1119,7 +1129,7 @@ function makeListHead() {
   const head = document.createElement('div');
   head.className = 'list-head';
   head.setAttribute('aria-hidden', 'true');
-  for (const name of ['Title', 'Authors', 'Year']) {
+  for (const name of ['Title', 'Published in', 'Authors', 'Year']) {
     const span = document.createElement('span');
     span.textContent = name;
     head.append(span);
