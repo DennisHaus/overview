@@ -17,7 +17,6 @@
 */
 window.DIAGRAM = {
   note: 'Wie ein Entwurf im richtigen Massstab verräumlicht wird, muss eine Methode im richtigen Zeitmassstab arbeiten. Diese Übereinstimmung wird hier als Zeitkongruenz bezeichnet. Im Diagramm wird dies durch die ähnliche Verschiebung sichtbar.',
-  hint: 'Ein Feld anklicken, um es zu öffnen.',
   centerLabel: 'Zeitkongruenz*',
 
   /* ---------------- Overview (drawing from x -50 to 1830, y 0 to 1720) ---------------- */
@@ -508,7 +507,6 @@ window.DIAGRAM = {
       }
       keys.append(cases);
       side.append(keys);
-      if (!view.row) side.append(html('p', 'dg-hint', D.hint));
       if (pubList) side.append(pubList);
 
       container.append(stageBox, side);

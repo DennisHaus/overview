@@ -1138,10 +1138,22 @@ body.landing {
     min-height: 0;
     overflow: auto;
     margin: 0;
-    padding: 18px clamp(16px, 2.4vw, 32px) 32px;
+    padding: clamp(24px, 3.5vh, 44px) clamp(28px, 4vw, 64px);
     border-bottom: 0;
     border-left: 1px solid var(--line);
+    /* the drawing takes whatever height is left, so everything fits the window */
+    display: flex;
+    flex-direction: column;
+    gap: clamp(14px, 2.5vh, 28px);
   }
+  .layout[data-kind="writing"] .diagram .dg-figure { flex: 1 1 0; min-height: 160px; display: flex; flex-direction: column; }
+  .layout[data-kind="writing"] .diagram .dg-svg { flex: 1 1 0; min-height: 0; width: 100%; height: 100%; max-width: none; }
+  .layout[data-kind="writing"] .diagram .dg-zoom { flex: 1 1 0; min-height: 0; grid-template-rows: auto minmax(0, 1fr) auto; }
+  .layout[data-kind="writing"] .diagram .dg-stage { min-height: 0; height: 100%; }
+  .layout[data-kind="writing"] .diagram .dg-track { height: 100%; }
+  .layout[data-kind="writing"] .diagram .dg-slot { height: 100%; }
+  .layout[data-kind="writing"] .diagram .dg-panel { width: 100%; height: 100%; }
+  .layout[data-kind="writing"] .diagram .dg-side { flex: none; gap: 12px; }
   /* the list is narrower here: title and year on top, outlet and authors below */
   .layout[data-kind="writing"] .card .meta,
   .layout[data-kind="writing"] .list-head { grid-template-columns: minmax(0, 1fr) 6ch; }
@@ -1154,7 +1166,6 @@ body.landing {
 /* Legend and note */
 .dg-side { display: grid; gap: 18px; font-size: .8rem; color: var(--muted); }
 .dg-note { margin: 0; line-height: 1.55; max-width: 70ch; }
-.dg-hint { margin: 0; color: var(--ink); }
 .dg-keys { display: flex; flex-wrap: wrap; gap: 14px 36px; align-items: start; }
 .dg-legend, .dg-pubs { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
 .dg-legend li, .dg-pubs li { display: flex; gap: 10px; align-items: baseline; }
@@ -1217,8 +1228,6 @@ body.landing {
 .dg-field:focus-visible .dg-ring { stroke-width: 16; }
 .dg-field:hover .dg-hit,
 .dg-field:focus-visible .dg-hit { fill: rgba(255, 255, 255, .14); }
-.dg-field:hover .dg-field-name,
-.dg-field:focus-visible .dg-field-name { text-decoration: underline; text-decoration-thickness: 3px; }
 .dg-svg:has(.dg-field:hover) .dg-field:not(:hover) { opacity: .45; }
 
 .dg-tri {
@@ -1239,8 +1248,6 @@ body.landing {
 .dg-pub-label { fill: var(--ink); font-size: 25px; }
 .dg-pub.is-link { cursor: pointer; outline: none; }
 .dg-pub.is-link .dg-pub-label { fill: var(--ink); text-decoration: underline; text-decoration-thickness: 2px; }
-.dg-pub.is-link:hover .dg-pub-label,
-.dg-pub.is-link:focus-visible .dg-pub-label { text-decoration-thickness: 3px; }
 .dg-pub.is-link:hover .dg-dot,
 .dg-pub.is-link:focus-visible .dg-dot { r: 13; }
 .dg-pub.is-link:focus-visible .dg-dot,
@@ -1289,3 +1296,22 @@ body.landing {
   .dg-case, .dg-blob, .dg-ring, .dg-track, .dg-field .dg-hit, .dg-field .dg-field-name { transition: none; }
 }
 .dg-blob { pointer-events: none; }
+
+/* compact legend beside the note, so the drawing gets the height */
+@media (min-width: 1000px) {
+  .layout[data-kind="writing"] .diagram .dg-side {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: 10px clamp(16px, 2.5vw, 36px);
+    align-items: start;
+    font-size: .74rem;
+  }
+  .layout[data-kind="writing"] .diagram .dg-note { line-height: 1.5; }
+  .layout[data-kind="writing"] .diagram .dg-keys { flex-direction: column; flex-wrap: nowrap; gap: 6px; }
+  .layout[data-kind="writing"] .diagram .dg-legend { gap: 3px; }
+  .layout[data-kind="writing"] .diagram .dg-cases { flex-direction: column; gap: 0; }
+  .layout[data-kind="writing"] .diagram .dg-case-btn { padding: 3px 6px; margin-left: -6px; align-items: center; }
+  .layout[data-kind="writing"] .diagram .dg-case-btn .dg-key { transform: none; }
+  .layout[data-kind="writing"] .diagram .dg-key-sub { display: block; }
+  .layout[data-kind="writing"] .diagram .dg-case-btn { align-items: baseline; line-height: 1.35; }
+  .layout[data-kind="writing"] .diagram .dg-case-btn .dg-key { transform: translateY(1px); }
+}
