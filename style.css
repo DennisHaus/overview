@@ -1046,7 +1046,7 @@ body.landing {
 .pin {
   width: 10px; height: 10px;
   border-radius: 50%;
-  background: #ffffff;
+  background: var(--pin, #ffffff);
   box-shadow: 0 0 0 3px rgba(0, 0, 0, .8);
   transition: transform .15s ease;
 }
@@ -1212,10 +1212,14 @@ body.landing {
 .dg-center { fill: var(--ink); font-size: 44px; font-weight: 600; }
 
 .dg-field { cursor: pointer; outline: none; }
+.dg-field .dg-hit, .dg-field .dg-field-name { transition: fill .15s, opacity .15s; }
 .dg-field:hover .dg-ring,
-.dg-field:focus-visible .dg-ring { stroke-width: 12; }
-.dg-field:hover .dg-hit { fill: rgba(255, 255, 255, .04); }
-.dg-field:focus-visible .dg-field-name { text-decoration: underline; }
+.dg-field:focus-visible .dg-ring { stroke-width: 16; }
+.dg-field:hover .dg-hit,
+.dg-field:focus-visible .dg-hit { fill: rgba(255, 255, 255, .14); }
+.dg-field:hover .dg-field-name,
+.dg-field:focus-visible .dg-field-name { text-decoration: underline; text-decoration-thickness: 3px; }
+.dg-svg:has(.dg-field:hover) .dg-field:not(:hover) { opacity: .45; }
 
 .dg-tri {
   fill: none; stroke: var(--c);
@@ -1232,16 +1236,11 @@ body.landing {
 
 .dg-dot { fill: var(--bg); stroke: var(--ink); stroke-width: 3.5; }
 .dg-dot.is-published { fill: var(--ink); }
-.dg-pub-label {
-  fill: var(--muted);
-  font-size: 25px;
-  paint-order: stroke;
-  stroke: var(--bg); stroke-width: 8px; stroke-linejoin: round;
-}
+.dg-pub-label { fill: var(--ink); font-size: 25px; }
 .dg-pub.is-link { cursor: pointer; outline: none; }
 .dg-pub.is-link .dg-pub-label { fill: var(--ink); text-decoration: underline; text-decoration-thickness: 2px; }
 .dg-pub.is-link:hover .dg-pub-label,
-.dg-pub.is-link:focus-visible .dg-pub-label { fill: #ffffff; }
+.dg-pub.is-link:focus-visible .dg-pub-label { text-decoration-thickness: 3px; }
 .dg-pub.is-link:hover .dg-dot,
 .dg-pub.is-link:focus-visible .dg-dot { r: 13; }
 .dg-pub.is-link:focus-visible .dg-dot,
@@ -1250,12 +1249,11 @@ body.landing {
 /* one drawing of a row */
 .dg-panel { display: block; width: 100%; height: auto; font-family: var(--font); overflow: visible; }
 .dg-axis { fill: var(--ink); font-size: 21px; }
-.dg-small { fill: var(--muted); font-size: 12.5px; }
-.dg-panel .dg-pub-label { font-size: 12.5px; stroke-width: 4px; }
+.dg-small { fill: var(--ink); font-size: 12.5px; }
+.dg-panel .dg-pub-label { font-size: 12.5px; }
 .dg-panel .dg-pub.is-link .dg-pub-label { text-decoration-thickness: 1px; }
 .dg-ref-ring { fill: none; stroke: var(--muted); stroke-width: 1.2; }
 .dg-item-ring { fill: none; stroke: var(--ink); stroke-width: 1.2; opacity: .8; }
-.dg-panel .dg-small { paint-order: stroke; stroke: var(--bg); stroke-width: 3px; stroke-linejoin: round; }
 
 /* row view */
 .dg-zoom { display: grid; gap: 14px; }
@@ -1288,6 +1286,6 @@ body.landing {
   .dg-svg { max-width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .dg-case, .dg-blob, .dg-ring, .dg-track { transition: none; }
+  .dg-case, .dg-blob, .dg-ring, .dg-track, .dg-field .dg-hit, .dg-field .dg-field-name { transition: none; }
 }
 .dg-blob { pointer-events: none; }

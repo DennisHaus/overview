@@ -50,14 +50,12 @@ window.DIAGRAM = {
   /* ---------------- Rows: three drawings per field ----------------
      Coordinates are relative to the centre of the circle (radius 177).
      Labels may have several lines, separated by \n.                    */
-  panelNames: ['Case Studies', 'Referenzen', 'Synthese'],
+  panelNames: ['Referenzen', 'Case Studies', 'Synthese'],
 
   rows: {
     theory: {
       title: 'Theoretisch / konzeptionell',
       panels: [
-        { axes: { top: 'Wissensform', left: 'Zeitskala' },
-          cases: { cs2: [93, -79, 7, -112], cs3: [-23, -28, -113, -61], cs1: [34, 52, 8, 76] } },
         { axes: { top: 'Technologie', left: 'Bild', right: 'Prozess', bottom: 'low-tec' },
           refs: [
             { x: -79, y: -114, r: 18, lx: -60, ly: -150, label: 'Love your Monsters\n(Latour)' },
@@ -86,14 +84,14 @@ window.DIAGRAM = {
             { x: 110, y: 59, r: 21, lx: 99, ly: 93, label: 'Chronografie' },
             { x: -50, y: 128, r: 23, lx: -98, ly: 131, label: 'Ambiguität' },
           ] },
+        { axes: { top: 'Wissensform', left: 'Zeitskala' },
+          cases: { cs2: [93, -79, 7, -112], cs3: [-23, -28, -113, -61], cs1: [34, 52, 8, 76] } },
       ],
     },
 
     method: {
       title: 'Methodisch',
       panels: [
-        { axes: { top: 'Wissensform', left: 'Zeitskala' },
-          cases: { cs3: [-63, -30, -113, -61], cs2: [61, -38, 53, -19], cs1: [35, 48, 8, 76] } },
         { axes: { top: 'datenbasiert', left: 'langer\nZeithorizont', right: 'kurzer\nZeithorizont', bottom: 'situativ-\nintuitiv' },
           refs: [
             { x: -56, y: -123, r: 79, lx: -122, ly: -108, label: 'Point Cloud Modelling\n(Girot, Fricker, Vollmer, …)' },
@@ -124,14 +122,14 @@ window.DIAGRAM = {
             { x: 18, y: 86, r: 13, lx: 37, ly: 86, label: 'physische\nSimulationen' },
             { x: 66, y: 140, r: 13, lx: 79, ly: 123, label: 'Video' },
           ] },
+        { axes: { top: 'Wissensform', left: 'Zeitskala' },
+          cases: { cs3: [-63, -30, -113, -61], cs2: [61, -38, 53, -19], cs1: [35, 48, 8, 76] } },
       ],
     },
 
     landscape: {
       title: 'Landschaftstypologisch',
       panels: [
-        { axes: { top: 'Landschaftsumgang', left: 'Zeitskala' },
-          cases: { cs2: [93, -79, 15, -107], cs3: [-30, -19, -90, -50], cs1: [51, 35, 66, 31] } },
         { axes: { top: 'Kontrolle', left: 'Zustand', right: 'Prozess', bottom: 'laissez-faire' },
           refs: [
             { x: -148, y: -154, r: 21, lx: -169, ly: -124, label: 'Linthkorrektion\n1807–1823' },
@@ -160,6 +158,8 @@ window.DIAGRAM = {
             { x: 25, y: 88, r: 18, lx: -47, ly: 118, label: 'Schwammlandschaft' },
             { x: 73, y: 91, r: 13, lx: 71, ly: 112, label: 'Moor' },
           ] },
+        { axes: { top: 'Landschaftsumgang', left: 'Zeitskala' },
+          cases: { cs2: [93, -79, 15, -107], cs3: [-30, -19, -90, -50], cs1: [51, 35, 66, 31] } },
       ],
     },
   },

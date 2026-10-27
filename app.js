@@ -19,12 +19,24 @@ const CONFIG = {
   // Language for place, region and country names found from coordinates ('en', 'de', 'it', …)
   placeLanguage: 'en',
 
+  // Places that belong to a case study get a pin in that case study's colour.
+  // A place belongs to a case study when its repo name, title or place name
+  // contains one of the words listed (upper/lower case and accents don't matter).
+  // Names and colours of the case studies are set in writings-diagram.js (DIAGRAM.cases).
+  // Places that match nothing keep a white pin.
+  caseStudyPlaces: {
+    cs1: ['biel', 'bienne', 'linth'],                     // Case Study 1, Landschaft als Litoral
+    cs2: ['kandersteg', 'brienz', 'brinzauls', 'blatten'], // Case Study 2, Terrain in Bewegung
+    cs3: [],                                               // Case Study 3, Wasser in der Zeit
+  },
+
   // Optional fixes per repo (key = repo name). Everything is optional.
   overrides: {
     // venezia_garden: { title: 'Venezia Garden', place: 'venice' },
     // some_repo: { kind: 'tool' },   // or kind: 'place' together with a place
     // some_repo: { place: { name: 'Sils Maria', country: 'Switzerland', lat: 46.43, lng: 9.76 } },
     // some_repo: { preview: 'https://dennishaus.github.io/some_repo/cover.jpg', description: 'Text' },
+    // some_repo: { caseStudy: 'cs3' },   // case study by hand (or caseStudy: '' for a white pin)
   },
 
   // Writings: PDFs kept in a folder of this repository and listed in writings.json
@@ -463,6 +475,19 @@ async function readSite(repo) {
   return meta;
 }
 
+// Which case study a place belongs to: override first, then the words in CONFIG.caseStudyPlaces
+function caseStudyFor(override, searchText) {
+  if (override.caseStudy !== undefined) return override.caseStudy || '';
+  for (const [id, words] of Object.entries(CONFIG.caseStudyPlaces || {})) {
+    if (words.some(word => norm(word) && searchText.includes(norm(word)))) return id;
+  }
+  return '';
+}
+
+function caseStudyInfo(id) {
+  return (window.DIAGRAM?.cases || []).find(c => c.id === id) || null;
+}
+
 function buildSite(repo, meta) {
   const o = CONFIG.overrides[repo.name] || {};
   const url = o.url || pageUrlFor(repo);
@@ -489,6 +514,7 @@ function buildSite(repo, meta) {
 
   return {
     id: repo.name,
+    caseStudy: kind === 'place' ? caseStudyFor(o, searchText) : '',
     title,
     url,
     source: repo.html_url,
@@ -813,6 +839,8 @@ function popupFor(site) {
 
   const where = document.createElement('span');
   where.textContent = placeLabel(site.place);
+  const study = caseStudyInfo(site.caseStudy);
+  if (study) where.textContent += `, ${study.name}: ${study.sub}`;
 
   const links = document.createElement('div');
   links.className = 'links';
@@ -829,6 +857,11 @@ function makeMarker(site, lngLat) {
   wrap.className = 'pin-wrap';
   wrap.setAttribute('aria-label', `${site.title}, ${placeLabel(site.place)}`);
   wrap.innerHTML = '<span class="pin"></span>';
+  const study = caseStudyInfo(site.caseStudy);
+  if (study) {
+    wrap.querySelector('.pin').style.setProperty('--pin', study.color);
+    wrap.setAttribute('aria-label', `${site.title}, ${placeLabel(site.place)}, ${study.name}: ${study.sub}`);
+  }
 
   const popup = new maplibregl.Popup({ offset: 14, closeButton: false, maxWidth: '260px' })
     .setDOMContent(popupFor(site));
