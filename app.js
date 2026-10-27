@@ -1215,7 +1215,7 @@ function applyFilter(fit = false) {
   let writings = 0;
 
   let earlierMatches = 0;
-  if (el.diagram) el.diagram.hidden = state.kind !== 'writing' || tokens.length > 0;
+  if (el.diagram) el.diagram.hidden = state.kind !== 'writing';
   for (const site of state.sites) {
     const match = (state.kind === 'all' || site.kind === state.kind) &&
       tokens.every(t => site.searchText.includes(t));
